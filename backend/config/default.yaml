@@ -1,0 +1,87 @@
+wake_word:
+  engine: "openwakeword"
+  sensitivity: 0.5
+  keyword: "jarvis"
+  openwakeword_model_path: ""
+  openwakeword_vad_threshold: 0.0
+  openwakeword_enable_speex: false
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  silence_threshold: 2.0
+  max_recording_duration: 30
+  min_recording_duration: 0.5
+  no_speech_timeout: 2.5
+  silence_stop_seconds: 1.0
+
+stt:
+  engine: "moonshine"
+  model: "tiny"
+  language: "en-us"
+  compute_type: "int8"
+  vosk_model_path: ""
+
+tts:
+  primary: "piper"
+  fallback: "local"
+  voice_id: "jarvis_custom"
+  model_id: "eleven_turbo_v2"
+  stability: 0.5
+  similarity_boost: 0.8
+  speaking_rate: 1.0
+  volume: 0.8
+  local_voice: "en_US-lessac-medium"
+  piper_model: "en_US-lessac-medium.onnx"
+  piper_speaker_id: null
+  piper_noise_scale: 0.667
+  piper_noise_w: 0.8
+  piper_sentence_silence: 0.0
+  kitten_model: "kitten-1"
+  kitten_voice: "alloy"
+  sample_rate: 22050
+
+brain:
+  providers:
+    default_provider: "gemini"
+    fallback_order:
+      - "claude"
+      - "gemini"
+      - "groq"
+      - "openrouter"
+      - "ollama"
+  models:
+    claude: "claude-sonnet-4-20250514"
+    gemini: "gemini-2.5-flash"
+    groq: "llama-3.3-70b-versatile"
+    openrouter: "openai/gpt-4o-mini"
+    ollama: "llama3.2"
+    summary_model: "claude-3-5-haiku-20241022"
+  token_budget: 4000
+  short_term_turns: 20
+  long_term_top_k: 3
+  stream_chunks: false
+
+web:
+  search_engine: "brave"
+  max_results: 5
+  safe_search: "moderate"
+  country: "US"
+  language: "en"
+  search_cache_ttl_seconds: 300
+  summary_cache_ttl_seconds: 3600
+
+auth:
+  enabled: false
+  mode: "passive"
+  threshold: "medium"
+  liveness: "sensitive_only"
+  pin_fallback: true
+  session_timeout_minutes: 30
+  reverify_minutes: 5
+  default_user_id: "default_user"
+  pin_code: "1234"
+
+logging:
+  level: "INFO"
+  file: "logs/jarvis.log"

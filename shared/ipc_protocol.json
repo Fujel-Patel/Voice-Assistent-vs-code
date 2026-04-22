@@ -1,0 +1,291 @@
+{
+  "version": "1.1",
+  "messages": {
+    "server_ready": {
+      "direction": "server->client",
+      "payload": {
+        "version": "string"
+      }
+    },
+    "voice_state_change": {
+      "direction": "server->client",
+      "payload": {
+        "state": "idle | wake_detected | listening | transcribing | verifying | thinking | speaking",
+        "previous_state": "string"
+      }
+    },
+    "transcription_result": {
+      "direction": "server->client",
+      "payload": {
+        "text": "string",
+        "confidence": "number (0-1)",
+        "language": "string"
+      }
+    },
+    "transcript_chunk": {
+      "direction": "server->client",
+      "payload": {
+        "text": "string",
+        "chunk": "string",
+        "is_final": "boolean"
+      }
+    },
+    "assistant_response": {
+      "direction": "server->client",
+      "payload": {
+        "text": "string",
+        "intent": "string",
+        "action_taken": "object | null",
+        "latency_ms": "number | null"
+      }
+    },
+    "assistant_response_chunk": {
+      "direction": "server->client",
+      "payload": {
+        "text_chunk": "string",
+        "is_final": "boolean"
+      }
+    },
+    "response_start": {
+      "direction": "server->client",
+      "payload": {
+        "request_id": "string",
+        "provider": "string"
+      }
+    },
+    "tts_audio": {
+      "direction": "server->client",
+      "payload": {
+        "audio_url": "string",
+        "text": "string",
+        "duration_ms": "number"
+      }
+    },
+    "tts_start": {
+      "direction": "server->client",
+      "payload": {
+        "text": "string"
+      }
+    },
+    "tts_chunk": {
+      "direction": "server->client",
+      "payload": {
+        "text": "string"
+      }
+    },
+    "tts_end": {
+      "direction": "server->client",
+      "payload": {
+        "duration_ms": "number"
+      }
+    },
+    "tts_started": {
+      "direction": "server->client",
+      "deprecated": true,
+      "alias_of": "tts_start",
+      "payload": {
+        "text": "string"
+      }
+    },
+    "tts_completed": {
+      "direction": "server->client",
+      "deprecated": true,
+      "alias_of": "tts_end",
+      "payload": {
+        "duration_ms": "number"
+      }
+    },
+    "audio_level": {
+      "direction": "server->client",
+      "payload": {
+        "levels": "number[] (0-1)"
+      }
+    },
+    "error": {
+      "direction": "server->client",
+      "payload": {
+        "code": "string",
+        "message": "string",
+        "recoverable": "boolean"
+      }
+    },
+    "health_status": {
+      "direction": "server->client",
+      "payload": {
+        "microphone": "boolean",
+        "model_loaded": "boolean",
+        "apis": {
+          "claude": "boolean",
+          "gemini": "boolean",
+          "groq": "boolean",
+          "openrouter": "boolean",
+          "ollama": "boolean",
+          "elevenlabs": "boolean"
+        }
+      }
+    },
+    "settings_response": {
+      "direction": "server->client",
+      "payload": {
+        "ok": "boolean",
+        "settings": "object",
+        "error": "string | null"
+      }
+    },
+    "settings_updated": {
+      "direction": "server->client",
+      "payload": {
+        "ok": "boolean",
+        "settings": "object",
+        "updated": "object"
+      }
+    },
+    "settings_sync": {
+      "direction": "server->client",
+      "payload": {
+        "ok": "boolean",
+        "settings": "object"
+      }
+    },
+    "api_key_validation": {
+      "direction": "server->client",
+      "payload": {
+        "provider": "string",
+        "valid": "boolean",
+        "details": "string"
+      }
+    },
+    "auth_result": {
+      "direction": "server->client",
+      "payload": {
+        "verified": "boolean",
+        "confidence": "number",
+        "mode": "string",
+        "pin_required": "boolean"
+      }
+    },
+    "auth_challenge": {
+      "direction": "server->client",
+      "payload": {
+        "type": "phrase | number | repeat",
+        "phrase": "string",
+        "timeout_seconds": "number"
+      }
+    },
+    "auth_challenge_result": {
+      "direction": "server->client",
+      "payload": {
+        "passed": "boolean",
+        "phrase_matched": "boolean",
+        "timing_natural": "boolean"
+      }
+    },
+    "enrollment_status": {
+      "direction": "server->client",
+      "payload": {
+        "step": "number",
+        "complete": "boolean",
+        "success": "boolean",
+        "error": "string | null"
+      }
+    },
+    "pin_result": {
+      "direction": "server->client",
+      "payload": {
+        "ok": "boolean",
+        "message": "string"
+      }
+    },
+    "user_command": {
+      "direction": "client->server",
+      "payload": {
+        "text": "string",
+        "source": "voice | keyboard"
+      }
+    },
+    "get_settings": {
+      "direction": "client->server",
+      "payload": {}
+    },
+    "update_setting": {
+      "direction": "client->server",
+      "payload": {
+        "key": "string",
+        "value": "any"
+      }
+    },
+    "update_settings_bulk": {
+      "direction": "client->server",
+      "payload": {
+        "settings": "object"
+      }
+    },
+    "validate_api_key": {
+      "direction": "client->server",
+      "payload": {
+        "provider": "string",
+        "key": "string"
+      }
+    },
+    "start_voice_enrollment": {
+      "direction": "client->server",
+      "payload": {
+        "user_id": "string"
+      }
+    },
+    "submit_voice_sample": {
+      "direction": "client->server",
+      "payload": {
+        "user_id": "string",
+        "step": "number",
+        "audio_base64": "string",
+        "sample_rate": "number"
+      }
+    },
+    "complete_voice_enrollment": {
+      "direction": "client->server",
+      "payload": {
+        "user_id": "string"
+      }
+    },
+    "start_listening": {
+      "direction": "client->server",
+      "payload": {
+        "source": "tap_to_speak | manual | always_on"
+      }
+    },
+    "set_always_on": {
+      "direction": "client->server",
+      "payload": {
+        "enabled": "boolean"
+      }
+    },
+    "verify_pin": {
+      "direction": "client->server",
+      "payload": {
+        "pin": "string"
+      }
+    },
+    "config_update": {
+      "direction": "client->server",
+      "payload": {
+        "key": "string",
+        "value": "any"
+      }
+    },
+    "interrupt": {
+      "direction": "client->server",
+      "payload": {}
+    },
+    "ping": {
+      "direction": "client->server",
+      "payload": {}
+    },
+    "pong": {
+      "direction": "server->client",
+      "payload": {
+        "timestamp": "ISO8601"
+      }
+    }
+  }
+}

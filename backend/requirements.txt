@@ -1,0 +1,83 @@
+# ============================================================
+# Jarvis Voice Assistant — Backend Requirements
+# Install: pip install -r requirements.txt
+#
+# Policy:
+# - "Required" packages are used by active runtime code paths.
+# - "Optional" packages enable specific provider/backends and degrade gracefully
+#   when absent.
+# ============================================================
+
+# ------------------------------------------------------------
+# Required: Core Runtime + Voice Pipeline
+# ------------------------------------------------------------
+aiosqlite>=0.20.0
+anthropic>=0.34.0
+beautifulsoup4>=4.12.0
+cryptography>=42.0.0
+duckduckgo-search>=6.0.0
+elevenlabs>=1.9.0
+fastapi>=0.115.0
+httpx>=0.27.0
+loguru>=0.7.2
+lxml>=5.0.0
+mss>=9.0.0
+numpy>=1.26.0
+Pillow>=10.0.0
+psutil>=6.0.0
+pyaudio>=0.2.14
+pydantic>=2.6.0
+pyperclip>=1.8.2
+pytesseract>=0.3.13
+python-dotenv>=1.0.0
+pyttsx3>=2.90
+pyyaml>=6.0.1
+readability-lxml>=0.8.1
+resemblyzer>=0.1.3
+scipy>=1.12.0
+screen-brightness-control>=0.24.2
+sounddevice>=0.4.6
+soundfile>=0.12.1
+tiktoken>=0.7.0
+uvicorn[standard]>=0.32.0
+useful-moonshine>=0.1.0
+tensorflow>=2.16.0,<3.0.0
+# Python 3.12 on Linux currently lacks compatible tflite-runtime wheels.
+# scripts/dev.sh installs openwakeword with --no-deps and uses ONNX fallback.
+openwakeword>=0.6.0; python_version < "3.12"
+piper-tts>=1.3.0
+webrtcvad-wheels>=2.0.14
+websockets>=13.0
+
+# ------------------------------------------------------------
+# Optional: Additional TTS/STT Backends
+# ------------------------------------------------------------
+# Legacy STT backend kept optional for compatibility with older configs
+# faster-whisper>=1.0.0
+# Used by backend/voice/tts_edge.py
+edge-tts>=7.0.0
+# Optional MP3 decode fallback when soundfile cannot decode provider output
+pydub>=0.25.1
+# Used by backend/voice/tts_kitten.py (legacy)
+# kittentts (install manually if needed)
+# Used by backend/voice/tts_kokoro.py
+# kokoro (install manually if needed)
+
+# ------------------------------------------------------------
+# Optional: Semantic Memory Quality
+# ------------------------------------------------------------
+# Used by backend/brain/memory/long_term.py (fallback exists when absent)
+sentence-transformers>=3.0.0
+
+# ------------------------------------------------------------
+# Optional: Legacy/Experimental Provider Module
+# ------------------------------------------------------------
+# Used by backend/brain/gemini_agent.py
+google-generativeai>=0.7.0
+
+# ------------------------------------------------------------
+# Testing
+# ------------------------------------------------------------
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.14.0

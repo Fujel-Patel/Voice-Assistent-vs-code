@@ -1,0 +1,88 @@
+{
+  "name": "jarvis-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Jarvis Voice Assistant — Electron + React HUD",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "electron:dev": "concurrently -k -p \"[{name}]\" -n \"VITE,ELECTRON\" -c \"cyan,yellow\" \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "electron:preview": "cross-env NODE_ENV=production electron ."
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "auto-launch": "^5.0.6",
+    "electron-store": "^8.2.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.465.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.6.1",
+    "tailwindcss": "^4.2.2",
+    "three": "^0.184.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/ui": "^2.0.0",
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "jsdom": "^25.0.0",
+    "vite": "^8.0.4",
+    "vitest": "^2.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "dev.fujel.jarvis",
+    "productName": "Jarvis",
+    "copyright": "Copyright © 2026 Fujel",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!.venv",
+          "!__pycache__",
+          "!*.pyc"
+        ]
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/data/
+backend/logs/
+
+# Models (large files)
+models/
+
+# Environment
+.env
+*.env.local
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/dist-electron/
+
+# Electron build
+frontend/dist-electron/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Editors
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Test artifacts
+.pytest_cache/
+**/.vitest/
+coverage/
+htmlcov/
+
+# Misc
+*.log

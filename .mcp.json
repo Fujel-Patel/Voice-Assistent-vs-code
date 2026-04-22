@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-sqlite",
+        "/home/fujel/Documents/Fujel-Developer/Voice",
+        "Assistent",
+        "vs",
+        "code/jarvis/backend/storage/db.py"
+      ],
+      "env": {}
+    }
+  }
+}
