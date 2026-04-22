@@ -30,6 +30,8 @@ class KokoroTTS:
         self._cancelled = True
         
     async def synthesize(self, text: str) -> bytes:
+        if self.pipeline is None:
+            raise RuntimeError("KokoroTTS is not available (kokoro package not installed)")
         self._cancelled = False
         # Default voice to use
         voice = 'af_bella' # one of the smaller/popular 
@@ -55,6 +57,8 @@ class KokoroTTS:
         return out.getvalue()
         
     async def stream_synthesize_sentence(self, text: str) -> AsyncIterator[bytes]:
+        if self.pipeline is None:
+            raise RuntimeError("KokoroTTS is not available (kokoro package not installed)")
         self._cancelled = False
         voice = 'af_bella'
         generator = self.pipeline(text, voice=voice, speed=1)

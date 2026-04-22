@@ -88,6 +88,8 @@ class WakeWordDetector:
         if "wakeword_models" not in model_kwargs:
             try:
                 openwakeword.utils.download_models()
+            except AttributeError:
+                logger.warning("openWakeWord download_models not available in this version")
             except Exception as exc:
                 logger.warning(f"openWakeWord model download skipped: {exc}")
 

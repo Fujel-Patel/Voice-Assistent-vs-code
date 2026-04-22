@@ -73,7 +73,7 @@ class AudioRecorder:
                     if self._cancel.is_set():
                         break
 
-                    audio_chunk, _overflowed = stream.read(frame_samples)
+                    audio_chunk, _overflowed = await asyncio.to_thread(stream.read, frame_samples)
                     mono_chunk = audio_chunk[:, 0] if audio_chunk.ndim > 1 else audio_chunk
                     pcm_bytes = mono_chunk.astype(np.int16).tobytes()
 
@@ -110,8 +110,6 @@ class AudioRecorder:
 
                     if detected_speech and silence_frames >= silence_frames_limit:
                         break
-
-                    await asyncio.sleep(0)
         except Exception as exc:
             await self._event_bus.publish("listener_error", {"message": f"recording failed: {exc}"})
             return None

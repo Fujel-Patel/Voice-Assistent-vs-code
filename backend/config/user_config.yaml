@@ -2,14 +2,13 @@ auth:
   mode: 'off'
   liveness: always
 tts:
-  primary: local
-  voice_profile: custom
+  primary: edge
+  piper_model: en_US-lessac-medium.onnx
 audio:
   silence_stop_seconds: 1.5
-  speaker_device: communications
 brain:
   stream_chunks: true
   models:
-    gemini: gemma-4-31b-it
-stt:
-  model: large-v3
+    gemini: gemini-2.5-flash
+wake_word:
+  sensitivity: 0.7

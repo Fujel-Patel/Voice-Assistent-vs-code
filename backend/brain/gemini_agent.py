@@ -1,16 +1,23 @@
 import os
-import google.generativeai as genai
 from typing import Dict, Any
 
+from google import genai
+
 class GeminiAgent:
-    def __init__(self, api_key: str = None, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str = None, model_name: str = "gemini-2.5-flash"):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
         self.model_name = model_name
-        self.model = genai.GenerativeModel(self.model_name)
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
 
     async def generate_response(self, prompt: str, context: Dict[str, Any] = None) -> str:
         # TODO: integrate context
-        response = await self.model.generate_content_async(prompt)
-        return response.text
+        if self.client is None:
+            raise RuntimeError("GEMINI_API_KEY is missing")
+
+        response = await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+        )
+
+        text = getattr(response, "text", None)
+        return text or ""

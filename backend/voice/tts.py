@@ -224,12 +224,29 @@ class TTSManager:
         return np.interp(dst_time, src_time, audio).astype(np.float32)
 
     def _decode_audio_bytes(self, encoded_audio: bytes) -> np.ndarray:
-        import soundfile as sf
-        from io import BytesIO
+        import io
+        # Try soundfile first (works for WAV/FLAC/OGG)
+        try:
+            import soundfile as sf
 
-        audio, sr = sf.read(BytesIO(encoded_audio), dtype="float32")
-        if isinstance(audio, np.ndarray) and audio.ndim > 1:
-            audio = audio.mean(axis=1)
-        if sr != self.config.tts.sample_rate:
-            audio = self._resample(audio, sr, self.config.tts.sample_rate)
-        return audio.astype(np.float32)
+            audio, sr = sf.read(io.BytesIO(encoded_audio), dtype="float32")
+            if isinstance(audio, np.ndarray) and audio.ndim > 1:
+                audio = audio.mean(axis=1)
+            if sr != self.config.tts.sample_rate:
+                audio = self._resample(audio, sr, self.config.tts.sample_rate)
+            return audio.astype(np.float32)
+        except Exception:
+            pass
+        # Fallback: pydub for MP3 (ElevenLabs output)
+        try:
+            from pydub import AudioSegment
+
+            segment = AudioSegment.from_file(io.BytesIO(encoded_audio))
+            segment = segment.set_frame_rate(self.config.tts.sample_rate).set_channels(1)
+            samples = np.array(segment.get_array_of_samples(), dtype=np.float32)
+            # Normalize based on sample width
+            max_val = float(2 ** (8 * segment.sample_width - 1))
+            return (samples / max_val).astype(np.float32)
+        except Exception as exc:
+            logger.error(f"Audio decode failed with all backends: {exc}")
+            return np.zeros(self.config.tts.sample_rate, dtype=np.float32)  # 1 second silence

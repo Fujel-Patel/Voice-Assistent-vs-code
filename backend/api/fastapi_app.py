@@ -5,7 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.logger import get_logger
 from main import get_backend
+
+logger = get_logger(__name__)
 
 
 class FastAPIWebSocketAdapter:
@@ -28,6 +31,12 @@ class FastAPIWebSocketAdapter:
             return await self._ws.receive_text()
         except WebSocketDisconnect:
             raise StopAsyncIteration
+        except RuntimeError as exc:
+            # "WebSocket is not connected" or similar
+            raise StopAsyncIteration from exc
+        except Exception as exc:
+            logger.warning(f"WebSocket receive error: {exc}")
+            raise StopAsyncIteration from exc
 
 
 @asynccontextmanager

@@ -115,7 +115,8 @@ async def test_search_caching(mocker) -> None:
     assert get_mock.await_count == 1
 
 
-def test_ssrf_protection() -> None:
+@pytest.mark.asyncio
+async def test_ssrf_protection() -> None:
     fetcher = WebFetcher()
     with pytest.raises(ValueError):
-        fetcher._validate_url("http://127.0.0.1/admin")
+        await fetcher._validate_url("http://127.0.0.1/admin")

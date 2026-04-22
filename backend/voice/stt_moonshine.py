@@ -27,12 +27,17 @@ class SpeechToTextMoonshine:
             detail = f" Original import error: {moonshine_import_error}" if moonshine_import_error else ""
             raise RuntimeError(
                 "Moonshine STT dependencies are unavailable. "
-                "Install backend requirements (includes useful-moonshine and tensorflow)."
+                "Install backend requirements (includes useful-moonshine)."
                 f"{detail}"
             )
-        
-        # Load the moonshine tiny model
-        self.model = moonshine.load_model("moonshine/tiny")
+
+        self._model = None
+
+    async def _ensure_model(self) -> None:
+        if self._model is not None:
+            return
+
+        self._model = await asyncio.to_thread(moonshine.load_model, "moonshine/tiny")
         logger.info("Moonshine tiny model loaded.")
 
     async def transcribe(
@@ -41,6 +46,7 @@ class SpeechToTextMoonshine:
         on_chunk: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
+        await self._ensure_model()
 
         if isinstance(audio_data, bytes):
             audio = np.frombuffer(audio_data, dtype=np.int16)
@@ -60,9 +66,18 @@ class SpeechToTextMoonshine:
 
         # Run model inference in executor so voice loop stays responsive.
         loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(None, self.model.transcribe, normalized)
+        tokens = await loop.run_in_executor(None, self._model.transcribe, normalized)
+        text = " ".join(tokens).strip() if isinstance(tokens, list) else str(tokens or "").strip()
         
         duration = time.perf_counter() - started_at
+
+        if not text or len(text.strip()) < 2:
+            return {
+                "text": "",
+                "confidence": 0.05,
+                "language": "en",
+                "duration_seconds": round(duration, 3),
+            }
         
         if on_chunk is not None and text:
             await on_chunk({

@@ -36,18 +36,40 @@ class PiperTTS:
         if not self.available:
             raise RuntimeError("piper-tts is not installed. Run `pip install piper-tts`")
 
-        model_name = str(getattr(self.config.tts, "piper_model", "") or "en_US-lessac-medium.onnx").strip()
-        if not model_name:
-            model_name = "en_US-lessac-medium.onnx"
+        import os
+        from pathlib import Path
 
-        if self._voice is not None and self._voice_model_name == model_name:
+        model_name_cfg = str(getattr(self.config.tts, "piper_model", "") or "en_US-lessac-medium.onnx").strip()
+
+        if self._voice is not None and self._voice_model_name == model_name_cfg:
             return self._voice
+
+        # Search locations in order
+        search_paths = [
+            Path(model_name_cfg),                                          # absolute path as given
+            Path.home() / ".jarvis" / "models" / "tts" / model_name_cfg,  # download_models.py location
+            Path.home() / ".local" / "share" / "piper" / model_name_cfg,  # piper default
+            Path("/usr/share/piper/voices") / model_name_cfg,             # system install
+        ]
+
+        resolved_path = None
+        for candidate in search_paths:
+            if candidate.exists():
+                resolved_path = os.fspath(candidate)
+                break
+
+        if resolved_path is None:
+            raise RuntimeError(
+                f"Piper model '{model_name_cfg}' not found. "
+                f"Run: python scripts/download_models.py\n"
+                f"Searched: {[str(p) for p in search_paths]}"
+            )
 
         from piper import PiperVoice
 
-        logger.info(f"Loading Piper voice model: {model_name}")
-        self._voice = PiperVoice.load(model_name, use_cuda=False)
-        self._voice_model_name = model_name
+        logger.info(f"Loading Piper voice model from: {resolved_path}")
+        self._voice = PiperVoice.load(resolved_path, use_cuda=False)
+        self._voice_model_name = model_name_cfg
         return self._voice
 
     async def synthesize(self, text: str) -> np.ndarray:

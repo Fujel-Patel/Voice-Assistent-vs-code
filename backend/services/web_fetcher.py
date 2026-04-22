@@ -22,7 +22,7 @@ class WebFetcher:
         self.timeout_seconds = timeout_seconds
 
     async def fetch_page(self, url: str) -> dict[str, Any]:
-        self._validate_url(url)
+        await self._validate_url(url)
 
         headers = {"User-Agent": self.USER_AGENT}
         try:
@@ -122,7 +122,7 @@ class WebFetcher:
                 chunks.append(text)
         return "\n".join(chunks)
 
-    def _validate_url(self, url: str) -> None:
+    async def _validate_url(self, url: str) -> None:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
             raise ValueError("Only HTTP/HTTPS URLs are allowed")
@@ -131,9 +131,10 @@ class WebFetcher:
         if not host:
             raise ValueError("Invalid URL host")
 
-        self._assert_public_host(host)
+        await asyncio.to_thread(self._assert_public_host, host)
 
     def _assert_public_host(self, host: str) -> None:
+        # This is now async-safe via asyncio.to_thread at the call site.
         try:
             addresses = socket.getaddrinfo(host, None)
         except socket.gaierror as exc:

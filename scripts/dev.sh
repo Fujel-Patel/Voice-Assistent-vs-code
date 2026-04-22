@@ -19,6 +19,13 @@ LOG_YELLOW='\033[1;33m'
 LOG_GREEN='\033[0;32m'
 LOG_NC='\033[0m'
 
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
 # Log filter to highlight errors and warnings and remove common noise
 filter_logs() {
   local prefix="$1"

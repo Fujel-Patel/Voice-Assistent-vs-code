@@ -194,6 +194,7 @@ class JarvisBackend:
         self.listener.start()
 
         await self.health_checker.start_periodic()
+        asyncio.create_task(self._ws_keepalive_loop(), name="ws-keepalive")
         asyncio.create_task(self._warm_startup_models(), name="startup-model-warmup")
         asyncio.create_task(self._voice_loop(), name="voice-pipeline-loop")
         self.websocket_ready = True
@@ -557,7 +558,7 @@ class JarvisBackend:
             return
 
         body = json.dumps(payload)
-        tasks = [client.send(body) for client in self.clients]
+        tasks = [client.send(body) for client in list(self.clients)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
@@ -644,6 +645,7 @@ class JarvisBackend:
                     final_chunk_payload: dict[str, Any] | None = None
                     collected_chunks: list[str] = []
                     tts_text_queue: asyncio.Queue[str | None] = asyncio.Queue()
+                    streaming_was_attempted = False
 
                     async def _tts_text_iter():
                         while True:
@@ -654,6 +656,7 @@ class JarvisBackend:
 
                     tts_playback_task: asyncio.Task | None = None
                     if self.config.brain.stream_chunks:
+                        streaming_was_attempted = True
                         await self.state_machine.transition(VoiceState.SPEAKING)
                         await self.broadcast(
                             self._message(
@@ -696,7 +699,10 @@ class JarvisBackend:
                                     )
                         await tts_text_queue.put(None)
 
-                    if final_chunk_payload is None:
+                    if not streaming_was_attempted or final_chunk_payload is None:
+                        if streaming_was_attempted:
+                            logger.warning("Streaming produced no final payload, falling back to non-streaming")
+                            tts_playback_task = None
                         brain_result = await self.brain_agent.process_input(user_text, {"request_id": request_id})
                         response_text = brain_result.get("response_text", "")
                         intent = brain_result.get("intent", "unknown")
@@ -973,6 +979,18 @@ class JarvisBackend:
         is_running = self.websocket_ready
         return is_running, "server running" if is_running else "server not running"
 
+    async def _ws_keepalive_loop(self) -> None:
+        """Send periodic pings to keep WebSocket connections alive through proxies."""
+        while not self.stop_event.is_set():
+            await asyncio.sleep(30)
+            if self.clients:
+                await self.broadcast(
+                    self._message(
+                        msg_type="ping",
+                        payload={"ts": datetime.now(timezone.utc).isoformat()},
+                    )
+                )
+
     async def _on_memory_rollover(self, turns: list[dict[str, Any]]) -> None:
         if not turns:
             return
@@ -1036,7 +1054,9 @@ class JarvisBackend:
         }
 
         # Try streaming path first for lower latency
+        streaming_was_attempted = False
         if self.config.brain.stream_chunks:
+            streaming_was_attempted = True
             collected_chunks: list[str] = []
             final_chunk_payload: dict[str, Any] | None = None
             tts_text_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -1086,14 +1106,20 @@ class JarvisBackend:
 
             await tts_text_queue.put(None)
 
-            if final_chunk_payload is not None:
+            if not streaming_was_attempted or final_chunk_payload is None:
+                if streaming_was_attempted:
+                    logger.warning("Streaming produced no final payload, falling back to non-streaming")
+                    tts_playback_task = None
+                brain_result = await self.brain_agent.process_input(user_text, {"request_id": request_id})
+                response_text = brain_result.get("response_text", "")
+                intent = brain_result.get("intent", "unknown")
+                action = brain_result.get("action")
+            else:
                 response_text = final_chunk_payload.get("response", "")
                 intent = final_chunk_payload.get("intent", "unknown")
                 action = final_chunk_payload.get("action")
-            else:
-                response_text = _stitch_text_chunks(collected_chunks)
-                intent = "unknown"
-                action = None
+                if not response_text:
+                    response_text = _stitch_text_chunks(collected_chunks)
 
             response_text = self._normalize_response_text(response_text)
             latency_ms = int((first_chunk_time - cmd_start) * 1000) if first_chunk_time else int((time.perf_counter() - cmd_start) * 1000)
@@ -1138,7 +1164,18 @@ class JarvisBackend:
                         )
                     )
 
-            await tts_playback_task
+            if tts_playback_task is not None:
+                await tts_playback_task
+            else:
+                await self.broadcast(
+                    self._message(
+                        msg_type="tts_chunk",
+                        payload={"text": response_text},
+                        request_id=request_id,
+                    )
+                )
+                audio_data = await self.tts_manager.synthesize(response_text)
+                await self.audio_player.play(audio_data, sample_rate=self.config.tts.sample_rate)
             await self.broadcast(
                 self._message(msg_type="tts_end", payload={}, request_id=request_id)
             )
