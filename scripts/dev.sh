@@ -65,9 +65,16 @@ PY
     return
   fi
 
-  echo -e "${CYAN}[JARVIS] Installing openWakeWord (ONNX-only fallback)...${NC}"
-  if ! "$PYTHON_BIN" -m pip install --disable-pip-version-check --no-deps openwakeword==0.6.0; then
-    echo -e "${YELLOW}[WARN] openWakeWord install failed. Wake-word detection may be unavailable.${NC}"
+  echo -e "${CYAN}[JARVIS] Installing openWakeWord...${NC}"
+  if "$PYTHON_BIN" -m pip install --disable-pip-version-check openwakeword==0.6.0; then
+    echo -e "${GREEN}[JARVIS] openWakeWord installed successfully.${NC}"
+  else
+    echo -e "${YELLOW}[WARN] Regular openWakeWord install failed. Trying ONNX-only fallback (--no-deps)...${NC}"
+    if ! "$PYTHON_BIN" -m pip install --disable-pip-version-check --no-deps openwakeword==0.6.0; then
+      echo -e "${YELLOW}[WARN] openWakeWord install failed completely. Wake-word detection will be unavailable.${NC}"
+    else
+      echo -e "${GREEN}[JARVIS] openWakeWord installed (ONNX-only mode).${NC}"
+    fi
   fi
 }
 
@@ -384,6 +391,12 @@ fi
 
 echo -e "${GREEN}[JARVIS] Starting frontend on :5173...${NC}"
 cd "$FRONTEND_DIR"
+
+if [ ! -d "node_modules" ]; then
+  echo -e "${YELLOW}[JARVIS] node_modules missing. Running npm install...${NC}"
+  npm install
+fi
+
 stdbuf -oL -eL npm run dev \
   > >(filter_logs "Frontend" | tee -a "$FRONTEND_LOG") \
   2>&1 &

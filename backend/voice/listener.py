@@ -4,6 +4,7 @@ import threading
 import time
 from collections.abc import Callable
 import asyncio
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -75,6 +76,11 @@ class WakeWordDetector:
             "enable_speex_noise_suppression": self._config.wake_word.openwakeword_enable_speex,
         }
 
+        # Linux environments often lack a compatible tflite-runtime wheel.
+        # Force ONNX when TFLite is not available so wake-word still works.
+        if importlib.util.find_spec("tflite_runtime") is None:
+            model_kwargs["inference_framework"] = "onnx"
+
         if model_path:
             resolved = Path(model_path).expanduser().resolve()
             if not resolved.exists():
@@ -93,13 +99,16 @@ class WakeWordDetector:
             except Exception as exc:
                 logger.warning(f"openWakeWord model download skipped: {exc}")
 
+            if model_kwargs.get("inference_framework") == "onnx":
+                self._ensure_openwakeword_onnx_assets(openwakeword)
+
         retries = 0
         while not self._stop_event.is_set():
             detector = None
             audio = None
             stream = None
             try:
-                detector = OpenWakeWordModel(**model_kwargs)
+                detector = self._init_detector_with_fallback(openwakeword, OpenWakeWordModel, model_kwargs)
 
                 audio = pyaudio.PyAudio()
                 stream = audio.open(
@@ -160,6 +169,72 @@ class WakeWordDetector:
                         del detector
                 except Exception:
                     pass
+
+    def _init_detector_with_fallback(self, openwakeword: object, model_cls: object, model_kwargs: dict[str, object]):
+        try:
+            return model_cls(**model_kwargs)
+        except Exception as exc:
+            if model_kwargs.get("inference_framework") != "onnx":
+                raise
+
+            available_models = self._discover_onnx_models(openwakeword)
+            if not available_models:
+                raise
+
+            logger.warning(
+                "openWakeWord ONNX default model load failed; retrying with discovered ONNX models: "
+                f"{[Path(p).name for p in available_models]} ({exc})"
+            )
+            model_kwargs["wakeword_models"] = available_models
+            return model_cls(**model_kwargs)
+
+    def _discover_onnx_models(self, openwakeword: object) -> list[str]:
+        try:
+            models_dir = Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+        except Exception:
+            return []
+
+        if not models_dir.exists():
+            return []
+
+        # Exclude VAD files; wakeword_models should only include wake-word detectors.
+        return [str(p) for p in sorted(models_dir.glob("*.onnx")) if "vad" not in p.name.lower()]
+
+    def _ensure_openwakeword_onnx_assets(self, openwakeword: object) -> None:
+        try:
+            models_dir = Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+            models_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            logger.warning(f"Unable to resolve openWakeWord models directory: {exc}")
+            return
+
+        candidates: list[str] = []
+        for mapping_name in ("FEATURE_MODELS", "MODELS"):
+            mapping = getattr(openwakeword, mapping_name, {})
+            if not isinstance(mapping, dict):
+                continue
+            for model_meta in mapping.values():
+                if not isinstance(model_meta, dict):
+                    continue
+                download_url = model_meta.get("download_url")
+                if isinstance(download_url, str) and download_url.endswith(".tflite"):
+                    candidates.append(download_url.replace(".tflite", ".onnx"))
+
+        missing_urls: list[str] = []
+        for url in candidates:
+            target_name = url.rsplit("/", 1)[-1]
+            if not (models_dir / target_name).exists():
+                missing_urls.append(url)
+
+        if not missing_urls:
+            return
+
+        logger.info(f"Downloading missing openWakeWord ONNX assets ({len(missing_urls)})")
+        for url in missing_urls:
+            try:
+                openwakeword.utils.download_file(url, target_directory=str(models_dir))
+            except Exception as exc:
+                logger.warning(f"Failed to download ONNX asset {url}: {exc}")
 
     def _keyword_aliases(self, keyword: str) -> set[str]:
         normalized = keyword.strip().lower().replace(" ", "_").replace("-", "_")

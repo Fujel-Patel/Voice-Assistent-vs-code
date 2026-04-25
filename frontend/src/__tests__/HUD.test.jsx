@@ -5,7 +5,7 @@
  * Mock WebSocket and voice state for rendering tests.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // TODO Phase 4: Wire up actual JSX rendering tests with @testing-library/react
 // Currently just environment smoke tests.

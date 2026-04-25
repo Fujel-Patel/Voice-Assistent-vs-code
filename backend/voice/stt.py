@@ -40,7 +40,7 @@ class SpeechToText:
             }
 
         peak = float(np.max(np.abs(audio))) if audio.size else 0.0
-        if peak < 5.0:
+        if peak < 1.0:
             return {
                 "text": "",
                 "confidence": 0.05,

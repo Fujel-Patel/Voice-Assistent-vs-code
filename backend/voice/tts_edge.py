@@ -92,15 +92,11 @@ class EdgeTTS:
             if self._cancelled or not mp3_buffer:
                 return
 
-            # Decode full MP3 to PCM and yield in chunks
+            # Decode full MP3 to PCM and yield as one large chunk per sentence
             audio = self._decode_mp3(bytes(mp3_buffer))
             pcm = (audio * 32767.0).astype(np.int16).tobytes()
-            chunk_size = 4096
-            for i in range(0, len(pcm), chunk_size):
-                if self._cancelled:
-                    break
-                yield pcm[i: i + chunk_size]
-                await asyncio.sleep(0)
+            yield pcm
+            await asyncio.sleep(0)
 
         except Exception as exc:
             logger.warning(f"Edge-TTS stream failed: {exc}")

@@ -46,6 +46,7 @@ const initialSettings = {
 
 // ── Actions ────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const SettingsActions = {
   UPDATE_SETTING: 'UPDATE_SETTING',
   BULK_UPDATE:    'BULK_UPDATE',
@@ -83,12 +84,14 @@ export function SettingsProvider({ children }) {
 
 // ── Hooks ──────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSettings() {
   const ctx = useContext(SettingsContext)
   if (!ctx) throw new Error('useSettings must be inside SettingsProvider')
   return ctx
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSettingsDispatch() {
   const ctx = useContext(SettingsDispatchContext)
   if (!ctx) throw new Error('useSettingsDispatch must be inside SettingsProvider')
@@ -102,6 +105,7 @@ export function useSettingsDispatch() {
  * Usage:
  *   const [volume, setVolume] = useSetting('ttsVolume')
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSetting(key) {
   const settings = useSettings()
   const dispatch = useSettingsDispatch()

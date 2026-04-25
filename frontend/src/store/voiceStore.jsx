@@ -31,6 +31,7 @@ const initialState = {
 
 // ── Action types ───────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const VoiceActions = {
   SET_VOICE_STATE:   'SET_VOICE_STATE',
   SET_TRANSCRIPT:    'SET_TRANSCRIPT',
@@ -101,12 +102,14 @@ export function VoiceStateProvider({ children }) {
 
 // ── Hooks ──────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useVoiceStore() {
   const ctx = useContext(VoiceStateContext)
   if (!ctx) throw new Error('useVoiceStore must be inside VoiceStateProvider')
   return ctx
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useVoiceDispatch() {
   const ctx = useContext(VoiceDispatchContext)
   if (!ctx) throw new Error('useVoiceDispatch must be inside VoiceStateProvider')

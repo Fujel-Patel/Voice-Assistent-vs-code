@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 MODEL_HOME = Path.home() / ".jarvis" / "models"
-PIPER_DIR = MODEL_HOME / "piper"
+PIPER_DIR = MODEL_HOME / "tts"
 
 
 def print_step(msg: str) -> None:
@@ -20,7 +20,7 @@ def ensure_dirs() -> None:
 def prepare_moonshine() -> None:
     print_step("Checking Moonshine Tiny STT")
     try:
-        import useful_moonshine as moonshine
+        import moonshine
 
         _ = moonshine.load_model("moonshine/tiny")
         print_step("Moonshine tiny model ready")
@@ -33,8 +33,14 @@ def prepare_piper(model_name: str) -> None:
     try:
         from piper import PiperVoice
 
-        _ = PiperVoice.load(model_name, use_cuda=False)
-        print_step(f"Piper model ready: {model_name}")
+        model_path = PIPER_DIR / model_name
+        if not model_path.exists():
+            print_step(f"Piper model missing: {model_path}")
+            print_step("Manual download recommended for now.")
+            return
+
+        _ = PiperVoice.load(str(model_path), use_cuda=False)
+        print_step(f"Piper model ready: {model_path}")
     except Exception as exc:
         print_step(f"Piper check skipped/failed: {exc}")
 

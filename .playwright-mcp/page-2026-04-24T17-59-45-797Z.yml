@@ -1,0 +1,92 @@
+- generic [ref=e3]:
+  - navigation "Primary navigation" [ref=e4]:
+    - link "HUD" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e6]: ◉
+      - generic [ref=e7]: HUD
+    - link "SETTINGS" [ref=e8] [cursor=pointer]:
+      - /url: /settings
+      - generic [ref=e9]: ⚙
+      - generic [ref=e10]: SETTINGS
+    - link "VOICE ID" [ref=e11] [cursor=pointer]:
+      - /url: /voice-enrollment
+      - generic [ref=e12]: ◈
+      - generic [ref=e13]: VOICE ID
+    - link "DASHBOARD" [ref=e14] [cursor=pointer]:
+      - /url: /dashboard
+      - generic [ref=e15]: ▦
+      - generic [ref=e16]: DASHBOARD
+  - generic [ref=e18]:
+    - banner [ref=e19]:
+      - generic [ref=e20]:
+        - heading "Jarvis Settings" [level=2] [ref=e21]
+        - paragraph [ref=e22]: Tune behavior, voice, AI, and visual interface in real time.
+      - generic [ref=e23]:
+        - button "Return to HUD" [ref=e24] [cursor=pointer]
+        - button "Open Dashboard" [ref=e25] [cursor=pointer]
+    - generic [ref=e26]:
+      - complementary [ref=e27]:
+        - button "[G] General" [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: "[G]"
+          - generic [ref=e30]: General
+        - button "[V] Voice & Audio" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: "[V]"
+          - generic [ref=e33]: Voice & Audio
+        - button "[K] API Keys" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: "[K]"
+          - generic [ref=e36]: API Keys
+        - button "[AI] AI & Brain" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]: "[AI]"
+          - generic [ref=e39]: AI & Brain
+        - button "[i] About" [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]: "[i]"
+          - generic [ref=e42]: About
+        - button "[UI] Appearance" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: "[UI]"
+          - generic [ref=e45]: Appearance
+      - main [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - heading "Appearance" [level=3] [ref=e49]
+            - paragraph [ref=e50]: Customize theme, visuals, and readability.
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - generic [ref=e53]: Theme
+              - combobox "Theme" [ref=e54]:
+                - option "Dark Sci-Fi" [selected]
+                - option "Dark Minimal"
+                - option "Cyberpunk"
+            - generic [ref=e55]:
+              - generic [ref=e56]: Accent Color
+              - combobox "Accent Color" [ref=e57]:
+                - option "Cyan" [selected]
+                - option "Green"
+                - option "Amber"
+                - option "Purple"
+                - option "Custom"
+            - generic [ref=e58]:
+              - generic [ref=e59]: HUD Animation Style
+              - combobox "HUD Animation Style" [ref=e60]:
+                - option "Arc Reactor" [selected]
+                - option "Pulse Ring"
+                - option "Particle Field"
+                - option "Minimal Dot"
+            - generic [ref=e61]:
+              - generic [ref=e62]:
+                - generic [ref=e63]: Animation Speed
+                - strong [ref=e64]: 1.0x
+              - slider "Animation Speed" [ref=e65]: "1"
+            - generic [ref=e66]:
+              - generic [ref=e68]: Reduced Animations
+              - switch "Reduced Animations" [ref=e69] [cursor=pointer]
+            - generic [ref=e71]:
+              - generic [ref=e72]:
+                - generic [ref=e73]: Window Opacity
+                - strong [ref=e74]: 100%
+              - slider "Window Opacity" [ref=e75]: "100"
+            - generic [ref=e76]:
+              - generic [ref=e77]: Font Size
+              - combobox "Font Size" [ref=e78]:
+                - option "Small"
+                - option "Normal" [selected]
+                - option "Large"

@@ -5,12 +5,14 @@ import { SETTINGS_DEFAULTS } from '../utils/settingsDefaults'
 export const useAppStore = create(
   devtools(
     persist(
-      (set, get) => ({
+      (set) => ({
         voiceState: 'idle',
         isConnected: false,
         isMuted: false,
         connectionState: 'disconnected',
         alwaysOnSpeaker: false,
+        theme: 'dark',
+
 
         messages: [],
         currentTranscription: '',
@@ -54,6 +56,8 @@ export const useAppStore = create(
           }),
         setMuted: (isMuted) => set({ isMuted }),
         setAlwaysOnSpeaker: (alwaysOnSpeaker) => set({ alwaysOnSpeaker }),
+        toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+
 
         addMessage: (role, content, metadata = {}) =>
           set((state) => ({
@@ -131,6 +135,7 @@ export const useAppStore = create(
           alwaysOnSpeaker: state.alwaysOnSpeaker,
           lastRoute: state.lastRoute,
           activeSettingsSection: state.activeSettingsSection,
+          messages: state.messages,
         }),
       },
     ),

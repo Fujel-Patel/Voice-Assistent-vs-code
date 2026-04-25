@@ -5,7 +5,7 @@
  * Mock WebSocket API for all tests.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // Mock global WebSocket
 class MockWebSocket {

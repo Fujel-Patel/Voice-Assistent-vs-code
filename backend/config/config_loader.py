@@ -50,7 +50,7 @@ class LoggingConfig(BaseModel):
 
 
 class TTSConfig(BaseModel):
-    primary: str = "piper"
+    primary: str = "edge"
     fallback: str = "local"
     voice_id: str = "jarvis_custom"
     model_id: str = "eleven_turbo_v2"

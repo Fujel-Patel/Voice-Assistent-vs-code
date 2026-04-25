@@ -81,6 +81,16 @@ echo -e "${CYAN}Installing Python dependencies (this may take a few minutes)...$
 pip install -r requirements.txt
 echo -e "${GREEN}✓ Python dependencies installed${NC}"
 
+# Explicitly install openwakeword with fallback
+echo -e "${CYAN}Installing openWakeWord...${NC}"
+if ! pip install openwakeword==0.6.0; then
+  echo -e "${YELLOW}⚠ Regular openWakeWord install failed. Trying ONNX-only fallback (--no-deps)...${NC}"
+  pip install --no-deps openwakeword==0.6.0
+  echo -e "${GREEN}✓ openWakeWord installed (ONNX-only mode)${NC}"
+else
+  echo -e "${GREEN}✓ openWakeWord installed${NC}"
+fi
+
 if command -v apt &>/dev/null; then
   echo -e "${CYAN}Installing Linux system packages...${NC}"
   sudo apt update
@@ -110,8 +120,8 @@ fi
 # ── Data directory ──────────────────────────────────────
 mkdir -p "$BACKEND_DIR/data"
 mkdir -p "$BACKEND_DIR/logs"
-mkdir -p "$PROJECT_ROOT/models/piper"
-echo -e "${GREEN}✓ Data directories created${NC}"
+mkdir -p "$HOME/.jarvis/models/tts"
+echo -e "${GREEN}✓ Data and model directories created at $HOME/.jarvis/models/tts${NC}"
 
 echo -e "${CYAN}Downloading required models...${NC}"
 "$BACKEND_DIR/.venv/bin/python" "$SCRIPT_DIR/download_models.py" || {

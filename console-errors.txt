@@ -1,0 +1,8 @@
+Total messages: 8 (Errors: 5, Warnings: 0)
+Returning 5 messages for level "error"
+
+[ERROR] WebSocket connection to 'ws://localhost:8765/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/hooks/useWebSocket.js:65
+[ERROR] WebSocket connection to 'ws://localhost:8765/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/hooks/useWebSocket.js:65
+[ERROR] WebSocket connection to 'ws://localhost:8765/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/hooks/useWebSocket.js:65
+[ERROR] WebSocket connection to 'ws://localhost:8765/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/hooks/useWebSocket.js:65
+[ERROR] WebSocket connection to 'ws://localhost:8765/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/hooks/useWebSocket.js:65

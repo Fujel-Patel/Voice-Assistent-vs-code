@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 
 /**
- * VoiceEnrollment.jsx — Voice enrollment flow screen (Image 2)
+ * Voice Enrollment.jsx — Voice enrollment flow screen (Image 2)
  * Props:
  *   currentStep: 1 | 2 | 3
  *   phrase: string
@@ -37,7 +37,7 @@ export default function VoiceEnrollment({
     onReRecord,
     onNextStep,
 }) {
-    const [isRecording, setIsRecording] = useState(true)
+    const [isRecording] = useState(true)
 
     const strengthLabel =
         profileStrength >= 90 ? 'EXCELLENT' :

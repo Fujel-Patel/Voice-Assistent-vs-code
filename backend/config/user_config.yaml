@@ -12,3 +12,5 @@ brain:
     gemini: gemini-2.5-flash
 wake_word:
   sensitivity: 0.7
+window:
+  start_minimized: true

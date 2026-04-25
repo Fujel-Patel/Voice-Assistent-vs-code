@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "tailwind-v4-shadcn": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "computedHash": "dedaff41ff3331cfe9734eee4203a1e85c6a013eec46df83d9c00e3d36e421f9"
+    }
+  }
+}
