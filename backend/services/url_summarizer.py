@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from config.config_loader import load_config
 from core.logger import get_logger
+
 from services.web_fetcher import WebFetcher
+
+if TYPE_CHECKING:
+    from brain.orchestrator import ClaudeAgent
 
 logger = get_logger(__name__)
 
 
 class URLSummarizer:
-    def __init__(self, claude_agent=None, fetcher: WebFetcher | None = None) -> None:
+    def __init__(
+        self, claude_agent: ClaudeAgent | None = None, fetcher: WebFetcher | None = None
+    ) -> None:
         self.config = load_config()
         self.claude_agent = claude_agent
         self.fetcher = fetcher or WebFetcher()
@@ -66,7 +72,7 @@ class URLSummarizer:
             final_prompt,
             {"preferred_provider": preferred_provider},
         )
-        return final.get("response_text", merged)
+        return str(final.get("response_text", merged))
 
     def _summary_prompt(self, text: str, style: str) -> str:
         styles = {

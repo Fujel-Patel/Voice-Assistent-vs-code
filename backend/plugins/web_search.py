@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from core.logger import get_logger
-from plugins.base import JarvisPlugin, PluginResult
 from services.brave_search import BraveSearch
 from services.duckduckgo import DuckDuckGoSearch
 from services.url_summarizer import URLSummarizer
 from services.web_fetcher import WebFetcher
+
+from plugins.base import JarvisPlugin, PluginResult
 
 logger = get_logger(__name__)
 
@@ -23,8 +24,12 @@ class WebSearchPlugin(JarvisPlugin):
         self.fetcher = WebFetcher()
         self.summarizer = URLSummarizer(claude_agent=None, fetcher=self.fetcher)
 
-    async def execute(self, intent: dict, context: dict) -> PluginResult:
-        params = intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+    async def execute(
+        self, intent: dict[str, Any], context: dict[str, Any]
+    ) -> PluginResult:
+        params = (
+            intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+        )
         action = str(params.get("action") or "search").strip().lower()
         query = str(params.get("query") or "").strip()
         url = str(params.get("url") or "").strip()
@@ -32,29 +37,59 @@ class WebSearchPlugin(JarvisPlugin):
 
         if action == "search":
             if not query:
-                return PluginResult(success=False, output="Please provide a search query.", error="missing_query")
-            return await self._handle_search(query, deep_search=deep_search, context=context)
+                return PluginResult(
+                    success=False,
+                    output="Please provide a search query.",
+                    error="missing_query",
+                )
+            return await self._handle_search(
+                query, deep_search=deep_search, context=context
+            )
 
         if action == "search_news":
             if not query:
-                return PluginResult(success=False, output="Please provide a news query.", error="missing_query")
-            return await self._handle_search(query, deep_search=deep_search, context=context, mode="news")
+                return PluginResult(
+                    success=False,
+                    output="Please provide a news query.",
+                    error="missing_query",
+                )
+            return await self._handle_search(
+                query, deep_search=deep_search, context=context, mode="news"
+            )
 
         if action == "summarize_url":
             if not url:
-                return PluginResult(success=False, output="Please provide a URL to summarize.", error="missing_url")
+                return PluginResult(
+                    success=False,
+                    output="Please provide a URL to summarize.",
+                    error="missing_url",
+                )
             summary = await self._build_summarizer(context).summarize_url(url)
-            return PluginResult(success=True, output=summary.get("summary", ""), data=summary)
+            return PluginResult(
+                success=True, output=summary.get("summary", ""), data=summary
+            )
 
         if action == "fetch":
             if not url:
-                return PluginResult(success=False, output="Please provide a URL to fetch.", error="missing_url")
+                return PluginResult(
+                    success=False,
+                    output="Please provide a URL to fetch.",
+                    error="missing_url",
+                )
             page = await self.fetcher.fetch_page(url)
             content = page.get("content", "")
-            preview = content[:2000] if content else page.get("error", "No readable content found.")
+            preview = (
+                content[:2000]
+                if content
+                else page.get("error", "No readable content found.")
+            )
             return PluginResult(success=True, output=preview, data=page)
 
-        return PluginResult(success=False, output=f"Unsupported web action: {action}", error="unsupported_action")
+        return PluginResult(
+            success=False,
+            output=f"Unsupported web action: {action}",
+            error="unsupported_action",
+        )
 
     async def _handle_search(
         self,
@@ -83,9 +118,17 @@ class WebSearchPlugin(JarvisPlugin):
                 return PluginResult(
                     success=True,
                     output=f"{instant['answer']} (source: {instant.get('source', 'DuckDuckGo')})",
-                    data={"results": [], "instant_answer": instant, "source": "duckduckgo"},
+                    data={
+                        "results": [],
+                        "instant_answer": instant,
+                        "source": "duckduckgo",
+                    },
                 )
-            return PluginResult(success=True, output="I couldn't find live results for that query.", data={"results": []})
+            return PluginResult(
+                success=True,
+                output="I couldn't find live results for that query.",
+                data={"results": []},
+            )
 
         pages = []
         if deep_search:
@@ -94,8 +137,12 @@ class WebSearchPlugin(JarvisPlugin):
 
         brain_agent = context.get("brain_agent")
         if brain_agent is not None and hasattr(brain_agent, "process_with_context"):
-            response = await brain_agent.process_with_context(query, results, pages=pages or None)
-            message = response.get("response_text", "") or "Here are the top search results."
+            response = await brain_agent.process_with_context(
+                query, results, pages=pages or None
+            )
+            message = (
+                response.get("response_text", "") or "Here are the top search results."
+            )
         else:
             message = self._format_results(query, results)
 
@@ -119,13 +166,27 @@ class WebSearchPlugin(JarvisPlugin):
     def _format_results(self, query: str, results: list[dict[str, Any]]) -> str:
         lines = [f"Top web results for '{query}':"]
         for idx, item in enumerate(results[:5], start=1):
-            lines.append(f"{idx}. {item.get('title', 'Untitled')} - {item.get('url', '')}")
+            lines.append(
+                f"{idx}. {item.get('title', 'Untitled')} - {item.get('url', '')}"
+            )
         return "\n".join(lines)
 
     def get_capabilities(self) -> list[dict[str, Any]]:
         return [
-            {"intent": "web-search", "description": "search: run live web search with Brave + DDG fallback"},
-            {"intent": "web-search", "description": "search_news: fetch latest news results"},
-            {"intent": "web-search", "description": "fetch: download and extract readable page text"},
-            {"intent": "web-search", "description": "summarize_url: summarize a URL with chunk-aware summarization"},
+            {
+                "intent": "web-search",
+                "description": "search: run live web search with Brave + DDG fallback",
+            },
+            {
+                "intent": "web-search",
+                "description": "search_news: fetch latest news results",
+            },
+            {
+                "intent": "web-search",
+                "description": "fetch: download and extract readable page text",
+            },
+            {
+                "intent": "web-search",
+                "description": "summarize_url: summarize a URL with chunk-aware summarization",
+            },
         ]

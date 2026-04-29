@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import httpx
-
 from core.error_handler import APIError, ConfigError
 from core.logger import get_logger
 from core.retry import retry
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
 
 logger = get_logger(__name__)
 
 
 class ElevenLabsTTS:
-    def __init__(self, config) -> None:
+    def __init__(self, config: JarvisConfig) -> None:
         self.config = config
         self._cancelled = False
         self._resolved_voice_id: str | None = None
@@ -56,7 +59,9 @@ class ElevenLabsTTS:
         if response.status_code == 429:
             raise APIError("ElevenLabs rate limited")
         if response.status_code >= 400:
-            raise APIError(f"ElevenLabs request failed: {response.status_code} {response.text}")
+            raise APIError(
+                f"ElevenLabs request failed: {response.status_code} {response.text}"
+            )
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         chars = len(text)
@@ -90,7 +95,9 @@ class ElevenLabsTTS:
         }
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
+            async with client.stream(
+                "POST", url, headers=headers, json=payload
+            ) as response:
                 if response.status_code == 429:
                     raise APIError("ElevenLabs rate limited")
                 if response.status_code == 404:
@@ -118,12 +125,16 @@ class ElevenLabsTTS:
 
         headers = {"xi-api-key": api_key, "Accept": "application/json"}
         async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get("https://api.elevenlabs.io/v1/voices", headers=headers)
+            response = await client.get(
+                "https://api.elevenlabs.io/v1/voices", headers=headers
+            )
 
         if response.status_code == 401:
             raise ConfigError("Invalid ElevenLabs API key")
         if response.status_code >= 400:
-            raise APIError(f"ElevenLabs voices fetch failed: {response.status_code} {response.text}")
+            raise APIError(
+                f"ElevenLabs voices fetch failed: {response.status_code} {response.text}"
+            )
 
         data = response.json() or {}
         voices = data.get("voices") or []

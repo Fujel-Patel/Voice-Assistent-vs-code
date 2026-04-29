@@ -4,15 +4,21 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
-
-from brain.intent import IntentClassifier
-from brain.prompt_templates import JARVIS_SYSTEM_PROMPT
+from anthropic.types import MessageParam
 from core.error_handler import APIError, ConfigError
 from core.logger import get_logger
 from core.retry import retry
+
+from brain.intent import IntentClassifier
+from brain.prompt_templates import JARVIS_SYSTEM_PROMPT
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
+
+    from brain.memory.context_builder import ContextBuilder
 
 logger = get_logger(__name__)
 
@@ -30,7 +36,12 @@ class BrainResult:
 class ClaudeAgent:
     """Phase-2 brain agent supporting multiple providers behind one interface."""
 
-    def __init__(self, config, context_builder, system_prompt: str | None = None) -> None:
+    def __init__(
+        self,
+        config: JarvisConfig,
+        context_builder: ContextBuilder,
+        system_prompt: str | None = None,
+    ) -> None:
         self.config = config
         self.context_builder = context_builder
         self.intent_classifier = IntentClassifier()
@@ -109,7 +120,9 @@ class ClaudeAgent:
             f"Based on these web results, answer the user's question below and cite source URLs inline.\n"
             f"Question: {query}"
         )
-        return await self.process_input(synthesis_prompt, {"preferred_provider": "claude"})
+        return await self.process_input(
+            synthesis_prompt, {"preferred_provider": "claude"}
+        )
 
     async def stream_response(
         self,
@@ -199,7 +212,9 @@ class ClaudeAgent:
             return await self._call_openai_compatible(provider_name, text)
         raise ConfigError(f"Unsupported provider: {provider_name}")
 
-    async def _stream_provider(self, provider_name: str, text: str) -> AsyncIterator[str]:
+    async def _stream_provider(
+        self, provider_name: str, text: str
+    ) -> AsyncIterator[str]:
         if provider_name in {"groq", "openrouter", "ollama"}:
             async for chunk in self._stream_openai_compatible(provider_name, text):
                 yield chunk
@@ -209,17 +224,21 @@ class ClaudeAgent:
         result = await self._call_provider(provider_name, text)
         parsed = self.intent_classifier.parse(result.raw_text)
         stream_text = (parsed.get("response") or result.response_text or "").strip()
-        
+
         # Yield in logical chunks (delimiters) to avoid stuttering TTS
         import re
+
         chunks = re.split(r"(?<=[.!?\n,])\s+", stream_text)
         for chunk in chunks:
             if chunk.strip():
                 yield chunk + " "
                 await asyncio.sleep(0.01)
 
-    async def _build_messages(self, text: str) -> list[dict[str, str]]:
-        return await self.context_builder.build_context(current_input=text)
+    async def _build_messages(self, text: str) -> list[MessageParam]:
+        return cast(
+            list[MessageParam],
+            await self.context_builder.build_context(current_input=text),
+        )
 
     @retry(max_retries=3, base_delay=1.0, exceptions_to_retry=(APIError,))
     async def _call_claude(self, text: str) -> BrainResult:
@@ -235,13 +254,17 @@ class ClaudeAgent:
         model = self.config.brain.models.claude
         client = AsyncAnthropic(api_key=key)
         messages = await self._build_messages(text)
+        # Anthropic's messages.create does not support 'system' role in messages list
+        filtered_messages: list[MessageParam] = [
+            m for m in messages if m["role"] in {"user", "assistant"}
+        ]
 
         response = await client.messages.create(
             model=model,
             max_tokens=800,
             temperature=0.2,
             system=self.system_prompt,
-            messages=messages,
+            messages=filtered_messages,
         )
 
         text_chunks = []
@@ -325,8 +348,12 @@ class ClaudeAgent:
         )
 
     @retry(max_retries=3, base_delay=1.0, exceptions_to_retry=(APIError,))
-    async def _call_openai_compatible(self, provider_name: str, text: str) -> BrainResult:
-        endpoint, key, model, extra_headers = self._openai_compatible_config(provider_name)
+    async def _call_openai_compatible(
+        self, provider_name: str, text: str
+    ) -> BrainResult:
+        endpoint, key, model, extra_headers = self._openai_compatible_config(
+            provider_name
+        )
         messages = await self._build_messages(text)
 
         payload = {
@@ -340,7 +367,9 @@ class ClaudeAgent:
             headers["Authorization"] = f"Bearer {key}"
 
         async with httpx.AsyncClient(timeout=45.0) as client:
-            r = await client.post(f"{endpoint}/chat/completions", headers=headers, json=payload)
+            r = await client.post(
+                f"{endpoint}/chat/completions", headers=headers, json=payload
+            )
             if r.status_code >= 400:
                 raise APIError(f"{provider_name} API error: {r.status_code} {r.text}")
             data = r.json()
@@ -361,8 +390,12 @@ class ClaudeAgent:
             raw_text=content,
         )
 
-    async def _stream_openai_compatible(self, provider_name: str, text: str) -> AsyncIterator[str]:
-        endpoint, key, model, extra_headers = self._openai_compatible_config(provider_name)
+    async def _stream_openai_compatible(
+        self, provider_name: str, text: str
+    ) -> AsyncIterator[str]:
+        endpoint, key, model, extra_headers = self._openai_compatible_config(
+            provider_name
+        )
         messages = await self._build_messages(text)
 
         headers = {"Content-Type": "application/json", **extra_headers}
@@ -385,7 +418,9 @@ class ClaudeAgent:
             ) as response:
                 if response.status_code >= 400:
                     body = await response.aread()
-                    raise APIError(f"{provider_name} stream error: {response.status_code} {body.decode('utf-8', 'ignore')}")
+                    raise APIError(
+                        f"{provider_name} stream error: {response.status_code} {body.decode('utf-8', 'ignore')}"
+                    )
 
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data:"):
@@ -397,11 +432,17 @@ class ClaudeAgent:
                         event = json.loads(data_line)
                     except json.JSONDecodeError:
                         continue
-                    delta = event.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    delta = (
+                        event.get("choices", [{}])[0]
+                        .get("delta", {})
+                        .get("content", "")
+                    )
                     if delta:
                         yield delta
 
-    def _openai_compatible_config(self, provider_name: str) -> tuple[str, str | None, str, dict[str, str]]:
+    def _openai_compatible_config(
+        self, provider_name: str
+    ) -> tuple[str, str | None, str, dict[str, str]]:
         if provider_name == "groq":
             key = self.config.provider_keys.groq_api_key
             if not key:

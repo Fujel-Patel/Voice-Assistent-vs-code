@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
-
 import voice.stt_vosk as stt_vosk_module
 from config.config_loader import JarvisConfig
 from voice.stt_vosk import SpeechToTextVosk
 
 
 class _FakeRecognizer:
-    def __init__(self, *_args, **_kwargs):
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         self._calls = 0
 
     def SetWords(self, _enabled: bool) -> None:
@@ -33,7 +32,7 @@ class _FakeRecognizer:
 
 class _FakeVosk:
     class Model:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             self.args = args
             self.kwargs = kwargs
 
@@ -41,7 +40,7 @@ class _FakeVosk:
 
 
 @pytest.mark.asyncio
-async def test_vosk_transcribe_emits_chunks(monkeypatch):
+async def test_vosk_transcribe_emits_chunks(monkeypatch: Any) -> None:
     monkeypatch.setattr(stt_vosk_module, "vosk", _FakeVosk)
 
     cfg = JarvisConfig()
@@ -52,7 +51,7 @@ async def test_vosk_transcribe_emits_chunks(monkeypatch):
     stt = SpeechToTextVosk(cfg)
     seen = []
 
-    async def _on_chunk(payload: dict):
+    async def _on_chunk(payload: dict[str, Any]) -> None:
         seen.append(payload)
 
     audio = (np.sin(np.linspace(0, 2.0, 16000)) * 32767).astype(np.int16)

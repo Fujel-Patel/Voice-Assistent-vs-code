@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from brain.intent import IntentClassifier, IntentRouter
 
 
@@ -29,7 +30,9 @@ def test_unknown_intent() -> None:
 
 def test_conversation_spacing_normalization() -> None:
     classifier = IntentClassifier()
-    payload = classifier.parse('{"intent":"conversation","response":"Hello,sir.IamJARVIS.HowmayIassistyou?","action":null}')
+    payload = classifier.parse(
+        '{"intent":"conversation","response":"Hello,sir.IamJARVIS.HowmayIassistyou?","action":null}'
+    )
     assert payload["intent"] == "conversation"
     assert payload["response"] == "Hello, sir. I am JARVIS. How may I assist you?"
 
@@ -38,7 +41,7 @@ def test_conversation_spacing_normalization() -> None:
 async def test_intent_router() -> None:
     called = {"value": False}
 
-    async def mock_handler(action):
+    async def mock_handler(action: dict[str, Any] | None) -> dict[str, Any]:
         called["value"] = True
         return {"status": "ok", "action": action}
 
@@ -49,7 +52,10 @@ async def test_intent_router() -> None:
         {
             "intent": "open-app",
             "response": "Opening VS Code.",
-            "action": {"type": "open-app", "params": {"app_name": "Visual Studio Code"}},
+            "action": {
+                "type": "open-app",
+                "params": {"app_name": "Visual Studio Code"},
+            },
         }
     )
 

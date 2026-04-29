@@ -120,7 +120,11 @@ class IntentClassifier:
         if not text:
             return None
 
-        fenced_candidates = [m.group(1).strip() for m in _CODE_FENCE_ANY_RE.finditer(text) if m.group(1).strip()]
+        fenced_candidates = [
+            m.group(1).strip()
+            for m in _CODE_FENCE_ANY_RE.finditer(text)
+            if m.group(1).strip()
+        ]
         for candidate in fenced_candidates:
             try:
                 parsed = json.loads(candidate)
@@ -161,7 +165,11 @@ class IntentClassifier:
 
         text = (raw or "").strip()
         if not text:
-            return {"intent": "unknown", "response": "Could you clarify that?", "action": None}
+            return {
+                "intent": "unknown",
+                "response": "Could you clarify that?",
+                "action": None,
+            }
 
         fenced = _CODE_FENCE_RE.match(text)
         candidate = fenced.group(1).strip() if fenced else text
@@ -173,10 +181,16 @@ class IntentClassifier:
             if isinstance(embedded_payload, dict):
                 try:
                     validated = validate_intent_payload(embedded_payload)
-                    validated["response"] = self._normalize_response_text(validated.get("response", ""))
+                    validated["response"] = self._normalize_response_text(
+                        validated.get("response", "")
+                    )
                     return validated
                 except IntentValidationError:
-                    response_text = str(embedded_payload.get("response") or embedded_payload.get("text") or "").strip()
+                    response_text = str(
+                        embedded_payload.get("response")
+                        or embedded_payload.get("text")
+                        or ""
+                    ).strip()
                     if response_text:
                         return {
                             "intent": "conversation",
@@ -187,7 +201,11 @@ class IntentClassifier:
             # If provider returned plain text, treat it as a normal conversation reply.
             normalized = self._normalize_response_text(candidate)
             if not self._looks_like_conversation_text(normalized):
-                return {"intent": "unknown", "response": "Could you clarify that?", "action": None}
+                return {
+                    "intent": "unknown",
+                    "response": "Could you clarify that?",
+                    "action": None,
+                }
 
             return {
                 "intent": "conversation",
@@ -197,11 +215,15 @@ class IntentClassifier:
 
         try:
             validated = validate_intent_payload(payload)
-            validated["response"] = self._normalize_response_text(validated.get("response", ""))
+            validated["response"] = self._normalize_response_text(
+                validated.get("response", "")
+            )
             return validated
         except IntentValidationError:
             if isinstance(payload, dict):
-                response_text = str(payload.get("response") or payload.get("text") or "").strip()
+                response_text = str(
+                    payload.get("response") or payload.get("text") or ""
+                ).strip()
                 if response_text:
                     return {
                         "intent": "conversation",
@@ -209,12 +231,22 @@ class IntentClassifier:
                         "action": None,
                     }
 
-            return {"intent": "unknown", "response": "Could you clarify that?", "action": None}
+            return {
+                "intent": "unknown",
+                "response": "Could you clarify that?",
+                "action": None,
+            }
 
 
 class IntentRouter:
-    def __init__(self, plugin_manager: PluginManager | None = None, context_provider: Callable[[], dict[str, Any]] | None = None) -> None:
-        self.handlers: dict[str, Callable[[dict[str, Any] | None], Awaitable[dict[str, Any]]]] = {}
+    def __init__(
+        self,
+        plugin_manager: PluginManager | None = None,
+        context_provider: Callable[[], dict[str, Any]] | None = None,
+    ) -> None:
+        self.handlers: dict[
+            str, Callable[[dict[str, Any] | None], Awaitable[dict[str, Any]]]
+        ] = {}
         self.plugin_manager = plugin_manager
         self.context_provider = context_provider or (lambda: {})
         self.register("conversation", self._conversation_handler)
@@ -234,7 +266,9 @@ class IntentRouter:
 
         action = validated.get("action")
         if action and self.plugin_manager is not None:
-            plugin_result = await self.plugin_manager.execute(action, self.context_provider())
+            plugin_result = await self.plugin_manager.execute(
+                action, self.context_provider()
+            )
             return {
                 "status": "ok" if plugin_result.get("success") else "error",
                 "message": plugin_result.get("message") or validated["response"],
@@ -259,7 +293,9 @@ class IntentRouter:
         result.setdefault("action", action)
         return result
 
-    async def _conversation_handler(self, action: dict[str, Any] | None) -> dict[str, Any]:
+    async def _conversation_handler(
+        self, action: dict[str, Any] | None
+    ) -> dict[str, Any]:
         return {"status": "ok", "message": "conversation", "action": action}
 
     async def _unknown_handler(self, action: dict[str, Any] | None) -> dict[str, Any]:

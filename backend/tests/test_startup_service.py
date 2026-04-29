@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from services.startup import StartupDependencies, StartupManager
 
 
@@ -9,16 +10,16 @@ from services.startup import StartupDependencies, StartupManager
 async def test_startup_manager_ready() -> None:
     called = {"broadcast": False}
 
-    async def noop_async():
+    async def noop_async() -> None:
         return None
 
-    def noop_sync():
+    def noop_sync() -> None:
         return None
 
-    async def health():
+    async def health() -> dict[str, Any]:
         return {"ok": True}
 
-    async def broadcast(_payload):
+    async def broadcast(_payload: Any) -> None:
         called["broadcast"] = True
 
     manager = StartupManager(
@@ -40,7 +41,7 @@ async def test_startup_manager_ready() -> None:
 
 @pytest.mark.asyncio
 async def test_startup_manager_degraded() -> None:
-    async def fail_step():
+    async def fail_step() -> None:
         raise RuntimeError("microphone unavailable")
 
     manager = StartupManager(
@@ -55,5 +56,5 @@ async def test_startup_manager_degraded() -> None:
     assert result["degraded_reasons"]
 
 
-async def _health() -> dict:
+async def _health() -> dict[str, Any]:
     return {"ok": False}

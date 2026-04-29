@@ -335,12 +335,10 @@ echo -e "${CYAN}[JARVIS] Waiting for backend readiness (ws required, /health pro
 backend_ready=false
 health_ready=false
 BACKEND_READY_TIMEOUT_SECONDS="${JARVIS_BACKEND_READY_TIMEOUT_SECONDS:-120}"
-BACKEND_READY_POLL_INTERVAL="${JARVIS_BACKEND_READY_POLL_INTERVAL_SECONDS:-0.5}"
+BACKEND_READY_POLL_INTERVAL="${JARVIS_BACKEND_READY_POLL_INTERVAL:-0.5}"
 BACKEND_READY_MAX_POLLS="$("$PYTHON_BIN" - <<PY
 timeout_seconds = float(${BACKEND_READY_TIMEOUT_SECONDS})
 poll_interval = float(${BACKEND_READY_POLL_INTERVAL})
-if poll_interval <= 0:
-  poll_interval = 0.5
 print(max(1, int(timeout_seconds / poll_interval)))
 PY
 )"

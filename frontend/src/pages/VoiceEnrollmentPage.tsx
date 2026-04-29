@@ -315,13 +315,16 @@ export default function VoiceEnrollmentPage() {
 
   return (
     <div className="min-h-full p-6">
-      <header className="flex items-start justify-between mb-6 gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-6">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Voice Enrollment</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Record three clear samples to build your voice profile.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <User className="w-6 h-6 text-primary" />
+            Voice Enrollment
+          </h2>
+          <p className="mt-1 text-muted-foreground">Record three clear samples to build your unique voice profile.</p>
         </div>
         <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 border border-white/10 transition-all"
+          className="flex items-center justify-center gap-2 w-48 px-5 py-2.5 rounded-xl text-sm font-semibold bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 transition-all shadow-sm"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="w-4 h-4" />

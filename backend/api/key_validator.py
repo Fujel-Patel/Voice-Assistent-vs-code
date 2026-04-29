@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 
 
-def _to_model_options(items: list[dict[str, Any]], *, id_key: str = "id", label_key: str = "name") -> list[dict[str, str]]:
+def _to_model_options(
+    items: list[dict[str, Any]], *, id_key: str = "id", label_key: str = "name"
+) -> list[dict[str, str]]:
     options: list[dict[str, str]] = []
     for item in items:
         model_id = str(item.get(id_key) or "").strip()
@@ -32,21 +35,36 @@ async def validate_anthropic_key(key: str) -> dict[str, Any]:
     }
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages", headers=headers, json=payload
+            )
         if response.status_code < 400:
             models: list[dict[str, str]] = []
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    models_res = await client.get("https://api.anthropic.com/v1/models", headers=headers)
+                    models_res = await client.get(
+                        "https://api.anthropic.com/v1/models", headers=headers
+                    )
                 if models_res.status_code < 400:
                     models_data = models_res.json() if models_res.text else {}
-                    models = _to_model_options(models_data.get("data", []), id_key="id", label_key="display_name")
+                    models = _to_model_options(
+                        models_data.get("data", []),
+                        id_key="id",
+                        label_key="display_name",
+                    )
             except Exception:
                 # Model discovery isn't critical for key validation.
                 pass
 
-            return {"valid": True, "details": "Anthropic key verified", "models": models[:100]}
-        return {"valid": False, "details": f"Anthropic rejected key ({response.status_code})"}
+            return {
+                "valid": True,
+                "details": "Anthropic key verified",
+                "models": models[:100],
+            }
+        return {
+            "valid": False,
+            "details": f"Anthropic rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
@@ -58,7 +76,9 @@ async def validate_elevenlabs_key(key: str) -> dict[str, Any]:
     headers = {"xi-api-key": key}
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://api.elevenlabs.io/v1/user/subscription", headers=headers)
+            response = await client.get(
+                "https://api.elevenlabs.io/v1/user/subscription", headers=headers
+            )
         if response.status_code < 400:
             data = response.json() if response.text else {}
             remaining = data.get("character_limit", 0) - data.get("character_count", 0)
@@ -67,14 +87,20 @@ async def validate_elevenlabs_key(key: str) -> dict[str, Any]:
                 "details": "ElevenLabs key verified",
                 "remaining_quota": max(0, remaining),
             }
-        return {"valid": False, "details": f"ElevenLabs rejected key ({response.status_code})"}
+        return {
+            "valid": False,
+            "details": f"ElevenLabs rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
 
 async def validate_openwakeword_key(_key: str) -> dict[str, Any]:
     # openWakeWord is fully local and does not require an API key.
-    return {"valid": True, "details": "openWakeWord is local and does not require an API key"}
+    return {
+        "valid": True,
+        "details": "openWakeWord is local and does not require an API key",
+    }
 
 
 async def validate_brave_key(key: str) -> dict[str, Any]:
@@ -85,13 +111,20 @@ async def validate_brave_key(key: str) -> dict[str, Any]:
         "Accept": "application/json",
         "X-Subscription-Token": key,
     }
-    params = {"q": "jarvis health check", "count": 1}
+    params: dict[str, Any] = {"q": "jarvis health check", "count": 1}
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://api.search.brave.com/res/v1/web/search", headers=headers, params=params)
+            response = await client.get(
+                "https://api.search.brave.com/res/v1/web/search",
+                headers=headers,
+                params=params,
+            )
         if response.status_code < 400:
             return {"valid": True, "details": "Brave key verified"}
-        return {"valid": False, "details": f"Brave rejected key ({response.status_code})"}
+        return {
+            "valid": False,
+            "details": f"Brave rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
@@ -118,8 +151,15 @@ async def validate_gemini_key(key: str) -> dict[str, Any]:
                 if model_id:
                     models.append({"value": model_id, "label": model_id})
 
-            return {"valid": True, "details": "Gemini key verified", "models": models[:100]}
-        return {"valid": False, "details": f"Gemini rejected key ({response.status_code})"}
+            return {
+                "valid": True,
+                "details": "Gemini key verified",
+                "models": models[:100],
+            }
+        return {
+            "valid": False,
+            "details": f"Gemini rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
@@ -131,12 +171,23 @@ async def validate_groq_key(key: str) -> dict[str, Any]:
     headers = {"Authorization": f"Bearer {key}"}
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://api.groq.com/openai/v1/models", headers=headers)
+            response = await client.get(
+                "https://api.groq.com/openai/v1/models", headers=headers
+            )
         if response.status_code < 400:
             data = response.json() if response.text else {}
-            models = _to_model_options(data.get("data", []), id_key="id", label_key="id")
-            return {"valid": True, "details": "Groq key verified", "models": models[:100]}
-        return {"valid": False, "details": f"Groq rejected key ({response.status_code})"}
+            models = _to_model_options(
+                data.get("data", []), id_key="id", label_key="id"
+            )
+            return {
+                "valid": True,
+                "details": "Groq key verified",
+                "models": models[:100],
+            }
+        return {
+            "valid": False,
+            "details": f"Groq rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
@@ -152,12 +203,23 @@ async def validate_openrouter_key(key: str) -> dict[str, Any]:
     }
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://openrouter.ai/api/v1/models", headers=headers)
+            response = await client.get(
+                "https://openrouter.ai/api/v1/models", headers=headers
+            )
         if response.status_code < 400:
             data = response.json() if response.text else {}
-            models = _to_model_options(data.get("data", []), id_key="id", label_key="name")
-            return {"valid": True, "details": "OpenRouter key verified", "models": models[:150]}
-        return {"valid": False, "details": f"OpenRouter rejected key ({response.status_code})"}
+            models = _to_model_options(
+                data.get("data", []), id_key="id", label_key="name"
+            )
+            return {
+                "valid": True,
+                "details": "OpenRouter key verified",
+                "models": models[:150],
+            }
+        return {
+            "valid": False,
+            "details": f"OpenRouter rejected key ({response.status_code})",
+        }
     except Exception as exc:
         return {"valid": False, "details": f"Validation error: {exc}"}
 
@@ -170,7 +232,9 @@ async def validate_ollama_key(key: str) -> dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:11434/api/tags", headers=headers)
+            response = await client.get(
+                "http://localhost:11434/api/tags", headers=headers
+            )
         if response.status_code < 400:
             data = response.json() if response.text else {}
             models = []

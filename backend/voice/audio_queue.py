@@ -15,7 +15,7 @@ class AudioQueue:
             if timeout is None:
                 return await self._queue.get()
             return await asyncio.wait_for(self._queue.get(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def clear(self) -> None:

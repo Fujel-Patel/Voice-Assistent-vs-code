@@ -1,0 +1,6 @@
+backend/api/schemas.py: error: Source file found twice under different module names: "backend.api.schemas" and "api.schemas"
+backend/api/schemas.py: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#mapping-file-paths-to-modules for more info
+backend/api/schemas.py: note: Common resolutions include:
+backend/api/schemas.py: note:     a) adding `__init__.py` somewhere,
+backend/api/schemas.py: note:     b) using `--explicit-package-bases` or adjusting `MYPYPATH`
+Found 1 error in 1 file (errors prevented further checking)

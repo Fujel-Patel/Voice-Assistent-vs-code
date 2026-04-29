@@ -6,7 +6,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from .key_validator import validate_key
 from config.config_loader import (
     ENV_FILE_PATH,
     export_config,
@@ -17,6 +16,8 @@ from config.config_loader import (
     save_setting,
 )
 from core.logger import get_logger
+
+from .key_validator import validate_key
 
 logger = get_logger(__name__)
 
@@ -35,7 +36,9 @@ _API_ENV_MAP = {
 class SettingsHandler:
     """Handles WebSocket CRUD operations for runtime settings and API keys."""
 
-    async def handle(self, message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def handle(
+        self, message_type: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         payload = payload or {}
 
         if message_type == "get_settings":
@@ -81,8 +84,12 @@ class SettingsHandler:
                 if problem is not None:
                     return self._error(f"{key}: {problem}")
 
-            regular_settings = {k: v for k, v in settings.items() if not str(k).startswith("api.")}
-            key_settings = {k: v for k, v in settings.items() if str(k).startswith("api.")}
+            regular_settings = {
+                k: v for k, v in settings.items() if not str(k).startswith("api.")
+            }
+            key_settings = {
+                k: v for k, v in settings.items() if str(k).startswith("api.")
+            }
 
             if regular_settings:
                 nested = self._unflatten(regular_settings)
@@ -97,7 +104,9 @@ class SettingsHandler:
                     "ok": True,
                     "settings": self._frontend_settings(),
                     "updated": settings,
-                    "restart_required": any(self._requires_restart(str(k)) for k in settings),
+                    "restart_required": any(
+                        self._requires_restart(str(k)) for k in settings
+                    ),
                 },
             }
 
@@ -161,9 +170,15 @@ class SettingsHandler:
             "wake_word.engine": flat.get("wake_word.engine", "openwakeword"),
             "wake_word.sensitivity": flat.get("wake_word.sensitivity", 0.5),
             "wake_word.keyword": flat.get("wake_word.keyword", "jarvis"),
-            "wake_word.openwakeword_model_path": flat.get("wake_word.openwakeword_model_path", ""),
-            "wake_word.openwakeword_vad_threshold": flat.get("wake_word.openwakeword_vad_threshold", 0.0),
-            "wake_word.openwakeword_enable_speex": flat.get("wake_word.openwakeword_enable_speex", False),
+            "wake_word.openwakeword_model_path": flat.get(
+                "wake_word.openwakeword_model_path", ""
+            ),
+            "wake_word.openwakeword_vad_threshold": flat.get(
+                "wake_word.openwakeword_vad_threshold", 0.0
+            ),
+            "wake_word.openwakeword_enable_speex": flat.get(
+                "wake_word.openwakeword_enable_speex", False
+            ),
             "audio.silence_stop_seconds": flat.get("audio.silence_stop_seconds", 2.0),
             "stt.engine": flat.get("stt.engine", "moonshine"),
             "stt.language": flat.get("stt.language", "en-us"),
@@ -172,11 +187,19 @@ class SettingsHandler:
             "tts.voice_id": flat.get("tts.voice_id", "jarvis_custom"),
             "tts.speaking_rate": flat.get("tts.speaking_rate", 1.0),
             "tts.volume": flat.get("tts.volume", 0.8),
-            "brain.providers.default_provider": flat.get("brain.providers.default_provider", "gemini"),
-            "brain.models.claude": flat.get("brain.models.claude", "claude-sonnet-4-20250514"),
+            "brain.providers.default_provider": flat.get(
+                "brain.providers.default_provider", "gemini"
+            ),
+            "brain.models.claude": flat.get(
+                "brain.models.claude", "claude-sonnet-4-20250514"
+            ),
             "brain.models.gemini": flat.get("brain.models.gemini", "gemini-2.5-flash"),
-            "brain.models.groq": flat.get("brain.models.groq", "llama-3.3-70b-versatile"),
-            "brain.models.openrouter": flat.get("brain.models.openrouter", "openai/gpt-4o-mini"),
+            "brain.models.groq": flat.get(
+                "brain.models.groq", "llama-3.3-70b-versatile"
+            ),
+            "brain.models.openrouter": flat.get(
+                "brain.models.openrouter", "openai/gpt-4o-mini"
+            ),
             "brain.models.ollama": flat.get("brain.models.ollama", "llama3.2"),
             "brain.short_term_turns": flat.get("brain.short_term_turns", 20),
             "brain.token_budget": flat.get("brain.token_budget", 4000),
@@ -198,7 +221,9 @@ class SettingsHandler:
             "auth.threshold": flat.get("auth.threshold", "medium"),
             "auth.liveness": flat.get("auth.liveness", "sensitive_only"),
             "auth.pin_fallback": flat.get("auth.pin_fallback", True),
-            "auth.session_timeout_minutes": flat.get("auth.session_timeout_minutes", 30),
+            "auth.session_timeout_minutes": flat.get(
+                "auth.session_timeout_minutes", 30
+            ),
             "api.anthropic": os.getenv("ANTHROPIC_API_KEY", ""),
             "api.gemini": os.getenv("GEMINI_API_KEY", ""),
             "api.groq": os.getenv("GROQ_API_KEY", ""),
@@ -228,7 +253,13 @@ class SettingsHandler:
                 return "must be between 5 and 200"
         if key == "stt.engine" and value not in {"moonshine"}:
             return "must be moonshine"
-        if key == "tts.primary" and value not in {"piper", "local", "kokoro", "edge", "elevenlabs"}:
+        if key == "tts.primary" and value not in {
+            "piper",
+            "local",
+            "kokoro",
+            "edge",
+            "elevenlabs",
+        }:
             return "must be one of piper, local, kokoro, edge, elevenlabs"
         if key == "brain.providers.default_provider" and value not in {
             "claude",
@@ -245,7 +276,11 @@ class SettingsHandler:
             return "must be one of low, medium, high"
         if key == "auth.mode" and value not in {"passive", "challenge", "off"}:
             return "must be one of passive, challenge, off"
-        if key == "auth.liveness" and value not in {"always", "sensitive_only", "never"}:
+        if key == "auth.liveness" and value not in {
+            "always",
+            "sensitive_only",
+            "never",
+        }:
             return "must be one of always, sensitive_only, never"
         if key == "auth.session_timeout_minutes":
             if not isinstance(value, int) or not (5 <= value <= 180):

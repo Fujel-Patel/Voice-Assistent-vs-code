@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any, cast
 
 from config.config_loader import load_config
 from core.logger import get_logger
@@ -42,11 +43,21 @@ class StartupManager:
 
         degraded_reasons: list[str] = []
 
-        await self._best_effort("Checking models...", self.deps.model_ready, degraded_reasons)
-        await self._best_effort("Starting voice pipeline...", self.deps.voice_init, degraded_reasons)
-        self._best_effort_sync("Loading plugins...", self.deps.plugin_discover, degraded_reasons)
-        await self._best_effort("Starting WebSocket server...", self.deps.ws_start, degraded_reasons)
-        await self._best_effort("Starting wake word listener...", self.deps.listener_start, degraded_reasons)
+        await self._best_effort(
+            "Checking models...", self.deps.model_ready, degraded_reasons
+        )
+        await self._best_effort(
+            "Starting voice pipeline...", self.deps.voice_init, degraded_reasons
+        )
+        self._best_effort_sync(
+            "Loading plugins...", self.deps.plugin_discover, degraded_reasons
+        )
+        await self._best_effort(
+            "Starting WebSocket server...", self.deps.ws_start, degraded_reasons
+        )
+        await self._best_effort(
+            "Starting wake word listener...", self.deps.listener_start, degraded_reasons
+        )
 
         if self.deps.health_check is not None:
             try:
@@ -58,7 +69,7 @@ class StartupManager:
             self.health = {"status": "unknown"}
 
         status = "ready" if not degraded_reasons else "degraded"
-        payload = {
+        payload: dict[str, Any] = {
             "type": "system_status",
             "payload": {
                 "status": status,
@@ -71,7 +82,7 @@ class StartupManager:
             await self.deps.broadcast(payload)
 
         logger.info(f"Startup complete. status={status}")
-        return payload["payload"]
+        return cast(dict[str, Any], payload["payload"])
 
     async def shutdown(self) -> None:
         logger.info("Shutting down Jarvis...")

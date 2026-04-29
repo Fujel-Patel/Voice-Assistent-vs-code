@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from enum import Enum
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from enum import StrEnum
+from typing import Any
 
 from core.event_bus import EventBus
 from core.logger import get_logger
@@ -10,7 +11,7 @@ from core.logger import get_logger
 logger = get_logger(__name__)
 
 
-class VoiceState(str, Enum):
+class VoiceState(StrEnum):
     IDLE = "idle"
     WAKE_DETECTED = "wake_detected"
     LISTENING = "listening"
@@ -24,18 +25,24 @@ VALID_TRANSITIONS: dict[VoiceState, set[VoiceState]] = {
     VoiceState.IDLE: {VoiceState.WAKE_DETECTED, VoiceState.THINKING},
     VoiceState.WAKE_DETECTED: {VoiceState.LISTENING, VoiceState.IDLE},
     VoiceState.LISTENING: {VoiceState.TRANSCRIBING, VoiceState.IDLE},
-    VoiceState.TRANSCRIBING: {VoiceState.VERIFYING, VoiceState.THINKING, VoiceState.IDLE},
+    VoiceState.TRANSCRIBING: {
+        VoiceState.VERIFYING,
+        VoiceState.THINKING,
+        VoiceState.IDLE,
+    },
     VoiceState.VERIFYING: {VoiceState.THINKING, VoiceState.IDLE},
     VoiceState.THINKING: {VoiceState.VERIFYING, VoiceState.SPEAKING, VoiceState.IDLE},
     VoiceState.SPEAKING: {VoiceState.IDLE, VoiceState.LISTENING},
 }
 
 
-StateBroadcast = Callable[[dict], Awaitable[None]]
+StateBroadcast = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 class VoicePipeline:
-    def __init__(self, event_bus: EventBus, state_broadcaster: StateBroadcast | None = None) -> None:
+    def __init__(
+        self, event_bus: EventBus, state_broadcaster: StateBroadcast | None = None
+    ) -> None:
         self._event_bus = event_bus
         self._state_broadcaster = state_broadcaster
         self.state = VoiceState.IDLE
@@ -50,7 +57,9 @@ class VoicePipeline:
         expected_state: VoiceState | set[VoiceState],
         new_state: VoiceState,
     ) -> bool:
-        expected_states = expected_state if isinstance(expected_state, set) else {expected_state}
+        expected_states = (
+            expected_state if isinstance(expected_state, set) else {expected_state}
+        )
 
         async with self._lock:
             if self.state not in expected_states:
@@ -81,7 +90,9 @@ class VoicePipeline:
         if self._state_broadcaster is not None:
             await self._state_broadcaster(payload)
 
-        logger.debug(f"Voice state transition: {previous_state.value} -> {new_state.value}")
+        logger.debug(
+            f"Voice state transition: {previous_state.value} -> {new_state.value}"
+        )
 
     async def handle_interrupt(self) -> None:
         if self.state == VoiceState.SPEAKING:

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from plugins.base import JarvisPlugin, PluginResult
+from typing import Any
+
 from vision.analyzer import ScreenAnalyzer
 from vision.capture import ScreenCapture
 from vision.ocr import OCREngine
+
+from plugins.base import JarvisPlugin, PluginResult
 
 
 class ScreenReaderPlugin(JarvisPlugin):
@@ -24,8 +27,12 @@ class ScreenReaderPlugin(JarvisPlugin):
         self.ocr = OCREngine()
         self.analyzer = ScreenAnalyzer()
 
-    async def execute(self, intent: dict, context: dict) -> PluginResult:
-        params = intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+    async def execute(
+        self, intent: dict[str, Any], context: dict[str, Any]
+    ) -> PluginResult:
+        params = (
+            intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+        )
         action = str(params.get("action") or "describe").strip().lower()
 
         try:
@@ -37,7 +44,9 @@ class ScreenReaderPlugin(JarvisPlugin):
             if action == "read_text":
                 image = await self.capture.capture_active_window()
                 text = await self.ocr.extract_text(image)
-                message = text if text else "I could not detect readable text on screen."
+                message = (
+                    text if text else "I could not detect readable text on screen."
+                )
                 return PluginResult(success=True, output=message, data={"text": text})
 
             if action == "read_error":
@@ -55,19 +64,36 @@ class ScreenReaderPlugin(JarvisPlugin):
                 return PluginResult(success=True, output=summary, data={"text": text})
 
             if action == "find_element":
-                target = str(params.get("target") or params.get("description") or "").strip()
+                target = str(
+                    params.get("target") or params.get("description") or ""
+                ).strip()
                 if not target:
-                    return PluginResult(success=False, output="Please specify which UI element to find.", error="missing_target")
+                    return PluginResult(
+                        success=False,
+                        output="Please specify which UI element to find.",
+                        error="missing_target",
+                    )
                 image = await self.capture.capture_active_window()
                 found = await self.analyzer.find_element(image, target)
-                return PluginResult(success=True, output=found.get("result", ""), data=found)
+                return PluginResult(
+                    success=True, output=found.get("result", ""), data=found
+                )
 
-            return PluginResult(success=False, output=f"Unsupported screen action: {action}", error="unsupported_action")
+            return PluginResult(
+                success=False,
+                output=f"Unsupported screen action: {action}",
+                error="unsupported_action",
+            )
         except Exception as exc:
-            return PluginResult(success=False, output="Screen analysis failed.", error=str(exc))
+            return PluginResult(
+                success=False, output="Screen analysis failed.", error=str(exc)
+            )
 
-    def get_capabilities(self) -> list[dict]:
-        return [{"intent": "screen-read", "description": f"{k}: {v}"} for k, v in self.ACTIONS.items()]
+    def get_capabilities(self) -> list[dict[str, Any]]:
+        return [
+            {"intent": "screen-read", "description": f"{k}: {v}"}
+            for k, v in self.ACTIONS.items()
+        ]
 
     def _summarize_text(self, text: str) -> str:
         clean = " ".join(text.split())

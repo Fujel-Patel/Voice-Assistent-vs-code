@@ -18,7 +18,10 @@ def test_available_tools_type() -> None:
     assert all(isinstance(tool, str) for tool in info.available_tools)
 
 
-def test_linux_commands(mocker) -> None:
+from typing import Any
+
+
+def test_linux_commands(mocker: Any) -> None:
     plugin = SystemControlPlugin()
     run = mocker.patch.object(plugin, "_run")
     mocker.patch("plugins.system_control.shutil.which", return_value="/usr/bin/pactl")

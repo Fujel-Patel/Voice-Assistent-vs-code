@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
+from typing import Any, cast
 
 import numpy as np
-
 from core.logger import get_logger
+from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
@@ -20,14 +21,20 @@ class SpeakerEmbeddingEngine:
     EMBEDDING_SIZE = 256
 
     def __init__(self, model_dir: Path | None = None) -> None:
-        self.model_dir = (model_dir or (Path.home() / ".jarvis" / "models" / "auth")).expanduser()
+        self.model_dir = (
+            model_dir or (Path.home() / ".jarvis" / "models" / "auth")
+        ).expanduser()
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self._encoder = None
 
-    def create_embedding(self, audio: np.ndarray, sample_rate: int = 16000) -> np.ndarray:
+    def create_embedding(
+        self, audio: NDArray[np.float32], sample_rate: int = 16000
+    ) -> NDArray[np.float32]:
         cleaned = self._preprocess_audio(audio, sample_rate)
         if cleaned.size < sample_rate:
-            raise ValueError("Audio too short for speaker embedding. Minimum length is 1 second.")
+            raise ValueError(
+                "Audio too short for speaker embedding. Minimum length is 1 second."
+            )
 
         encoder = self._get_resemblyzer_encoder()
         if encoder is not None:
@@ -36,7 +43,9 @@ class SpeakerEmbeddingEngine:
 
         return self._fallback_embedding(cleaned, sample_rate)
 
-    def compare_embeddings(self, emb1: np.ndarray, emb2: np.ndarray) -> float:
+    def compare_embeddings(
+        self, emb1: NDArray[np.float32], emb2: NDArray[np.float32]
+    ) -> float:
         a = self._normalize_embedding(np.asarray(emb1, dtype=np.float32))
         b = self._normalize_embedding(np.asarray(emb2, dtype=np.float32))
 
@@ -47,8 +56,13 @@ class SpeakerEmbeddingEngine:
         similarity = float(np.dot(a, b) / denom)
         return float(np.clip(similarity, 0.0, 1.0))
 
-    def average_embeddings(self, embeddings: Iterable[np.ndarray]) -> np.ndarray:
-        vectors = [self._normalize_embedding(np.asarray(vector, dtype=np.float32)) for vector in embeddings]
+    def average_embeddings(
+        self, embeddings: Iterable[NDArray[np.float32]]
+    ) -> NDArray[np.float32]:
+        vectors = [
+            self._normalize_embedding(np.asarray(vector, dtype=np.float32))
+            for vector in embeddings
+        ]
         if len(vectors) < 1:
             raise ValueError("No embeddings provided")
 
@@ -56,7 +70,9 @@ class SpeakerEmbeddingEngine:
         mean = np.mean(stacked, axis=0)
         return self._normalize_embedding(mean)
 
-    def quality_score(self, audio: np.ndarray, sample_rate: int = 16000) -> float:
+    def quality_score(
+        self, audio: NDArray[np.float32], sample_rate: int = 16000
+    ) -> float:
         cleaned = self._preprocess_audio(audio, sample_rate)
         if cleaned.size == 0:
             return 0.0
@@ -69,7 +85,9 @@ class SpeakerEmbeddingEngine:
         noise_penalty = 0.2 if crest < 2.0 else 0.0
         return float(np.clip(snr_like - clipping_penalty - noise_penalty, 0.0, 1.0))
 
-    def _preprocess_audio(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    def _preprocess_audio(
+        self, audio: NDArray[np.float32], sample_rate: int
+    ) -> NDArray[np.float32]:
         waveform = np.asarray(audio, dtype=np.float32)
         if waveform.ndim > 1:
             waveform = np.mean(waveform, axis=1)
@@ -95,7 +113,9 @@ class SpeakerEmbeddingEngine:
 
         return waveform.astype(np.float32)
 
-    def _resample_linear(self, audio: np.ndarray, in_rate: int, out_rate: int) -> np.ndarray:
+    def _resample_linear(
+        self, audio: NDArray[np.float32], in_rate: int, out_rate: int
+    ) -> NDArray[np.float32]:
         if in_rate == out_rate:
             return audio
         ratio = out_rate / in_rate
@@ -104,9 +124,14 @@ class SpeakerEmbeddingEngine:
         left = np.floor(positions).astype(int)
         right = np.clip(left + 1, 0, len(audio) - 1)
         alpha = positions - left
-        return (audio[left] * (1.0 - alpha) + audio[right] * alpha).astype(np.float32)
+        return cast(
+            NDArray[np.float32],
+            (audio[left] * (1.0 - alpha) + audio[right] * alpha).astype(np.float32),
+        )
 
-    def _fallback_embedding(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    def _fallback_embedding(
+        self, audio: NDArray[np.float32], sample_rate: int
+    ) -> NDArray[np.float32]:
         windowed = audio * np.hanning(len(audio))
         spectrum = np.abs(np.fft.rfft(windowed))
         if spectrum.size < 8:
@@ -114,12 +139,18 @@ class SpeakerEmbeddingEngine:
 
         # Bucket FFT magnitudes into 256 bands.
         chunks = np.array_split(spectrum, self.EMBEDDING_SIZE)
-        vector = np.array([float(np.mean(chunk)) if chunk.size else 0.0 for chunk in chunks], dtype=np.float32)
+        vector = np.array(
+            [float(np.mean(chunk)) if chunk.size else 0.0 for chunk in chunks],
+            dtype=np.float32,
+        )
 
         # Add temporal features for better discrimination.
         frame = int(sample_rate * 0.03)
         if frame > 0 and len(audio) >= frame:
-            energy = [float(np.mean(np.square(audio[idx : idx + frame]))) for idx in range(0, len(audio) - frame, frame)]
+            energy = [
+                float(np.mean(np.square(audio[idx : idx + frame])))
+                for idx in range(0, len(audio) - frame, frame)
+            ]
             if energy:
                 trend = np.interp(
                     np.linspace(0, len(energy) - 1, self.EMBEDDING_SIZE),
@@ -130,7 +161,9 @@ class SpeakerEmbeddingEngine:
 
         return self._normalize_embedding(vector)
 
-    def _normalize_embedding(self, embedding: np.ndarray) -> np.ndarray:
+    def _normalize_embedding(
+        self, embedding: NDArray[np.float32]
+    ) -> NDArray[np.float32]:
         if embedding.shape[0] != self.EMBEDDING_SIZE:
             embedding = np.resize(embedding, self.EMBEDDING_SIZE)
 
@@ -139,7 +172,7 @@ class SpeakerEmbeddingEngine:
             return np.zeros(self.EMBEDDING_SIZE, dtype=np.float32)
         return (embedding / norm).astype(np.float32)
 
-    def _get_resemblyzer_encoder(self):
+    def _get_resemblyzer_encoder(self) -> Any:
         if self._encoder is not None:
             return self._encoder
 
@@ -149,7 +182,9 @@ class SpeakerEmbeddingEngine:
             logger.info("Loading resemblyzer VoiceEncoder for speaker authentication")
             self._encoder = VoiceEncoder()
         except Exception as exc:
-            logger.warning(f"Resemblyzer unavailable, using fallback embedding engine: {exc}")
+            logger.warning(
+                f"Resemblyzer unavailable, using fallback embedding engine: {exc}"
+            )
             self._encoder = None
 
         return self._encoder

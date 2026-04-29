@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import traceback
 from dataclasses import dataclass
+from typing import Any
 
 from core.logger import get_logger
 
@@ -35,7 +36,7 @@ class ErrorPayload:
     message: str
     recoverable: bool = True
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "code": self.code,
             "message": self.message,
@@ -51,12 +52,18 @@ def to_user_error(exc: Exception) -> ErrorPayload:
     if isinstance(exc, APIError):
         return ErrorPayload(code=exc.code, message="External service request failed.")
     if isinstance(exc, ConfigError):
-        return ErrorPayload(code=exc.code, message="Configuration is invalid.", recoverable=False)
+        return ErrorPayload(
+            code=exc.code, message="Configuration is invalid.", recoverable=False
+        )
     return ErrorPayload(code="UNKNOWN_ERROR", message="An unexpected error occurred.")
 
 
 def setup_global_error_handler() -> None:
-    def _handle_uncaught(exc_type, exc_value, exc_tb):
+    def _handle_uncaught(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        exc_tb: Any,
+    ) -> None:
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_tb)
             return

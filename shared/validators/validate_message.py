@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-
 REQUIRED_KEYS = {"type", "payload"}
 OPTIONAL_KEYS = {"timestamp", "request_id"}
 

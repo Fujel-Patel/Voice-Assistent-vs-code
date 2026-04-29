@@ -1,23 +1,27 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
 import numpy as np
 import pytest
-
 from config.config_loader import load_config
 from core.event_bus import EventBus
 
 
 @pytest.fixture
-def mock_audio() -> np.ndarray:
+def mock_audio() -> NDArray[np.int16]:
     sample_rate = 16000
     duration = 1.0
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     wave = 0.2 * np.sin(2 * np.pi * 440 * t)
-    return (wave * 32767).astype(np.int16)
+    return cast("NDArray[np.int16]", (wave * 32767).astype(np.int16))
 
 
 @pytest.fixture
-def mock_config() -> dict:
+def mock_config() -> dict[str, Any]:
     cfg = load_config()
     return cfg.model_dump()
 

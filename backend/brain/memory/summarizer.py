@@ -8,11 +8,13 @@ logger = get_logger(__name__)
 
 
 class Summarizer:
-    def __init__(self, brain_agent, long_term_memory) -> None:
+    def __init__(self, brain_agent: Any, long_term_memory: Any) -> None:
         self.brain_agent = brain_agent
         self.long_term_memory = long_term_memory
 
-    async def summarize_turns(self, session_id: str, turns: list[dict[str, Any]]) -> dict[str, Any]:
+    async def summarize_turns(
+        self, session_id: str, turns: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         if not turns:
             return {"summary": "", "topics": [], "preferences": {}}
 
@@ -23,11 +25,15 @@ class Summarizer:
             "Return strict JSON with keys: summary, topics, preferences.",
             "Conversation:",
         ]
-        prompt_lines.extend(f"- {t.get('role', 'user')}: {t.get('content', '')}" for t in turns)
+        prompt_lines.extend(
+            f"- {t.get('role', 'user')}: {t.get('content', '')}" for t in turns
+        )
         prompt = "\n".join(prompt_lines)
 
         try:
-            preferred_provider = self.brain_agent.config.brain.providers.default_provider
+            preferred_provider = (
+                self.brain_agent.config.brain.providers.default_provider
+            )
             result = await self.brain_agent.process_input(
                 prompt,
                 {"preferred_provider": preferred_provider},
@@ -48,7 +54,9 @@ class Summarizer:
         )
 
         for key, value in parsed.get("preferences", {}).items():
-            await self.long_term_memory.learn_preference(str(key), str(value), source="inferred")
+            await self.long_term_memory.learn_preference(
+                str(key), str(value), source="inferred"
+            )
 
         return parsed
 
@@ -61,8 +69,12 @@ class Summarizer:
                 return None
             return {
                 "summary": str(obj.get("summary", "")),
-                "topics": obj.get("topics", []) if isinstance(obj.get("topics"), list) else [],
-                "preferences": obj.get("preferences", {}) if isinstance(obj.get("preferences"), dict) else {},
+                "topics": obj.get("topics", [])
+                if isinstance(obj.get("topics"), list)
+                else [],
+                "preferences": obj.get("preferences", {})
+                if isinstance(obj.get("preferences"), dict)
+                else {},
             }
         except Exception:
             return None

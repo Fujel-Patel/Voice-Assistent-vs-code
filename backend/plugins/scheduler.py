@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Jarvis Plugins — Scheduler Stub (Phase 8)
 ==========================================
@@ -5,8 +7,11 @@ Phase 8 will implement task scheduling using APScheduler.
 Architecture review: "Remind me in 30 minutes" needs a scheduler.
 """
 
-from plugins.base import JarvisPlugin, PluginResult
+from typing import Any
+
 from core.logger import get_logger
+
+from plugins.base import JarvisPlugin, PluginResult
 
 logger = get_logger(__name__)
 
@@ -17,7 +22,9 @@ class SchedulerPlugin(JarvisPlugin):
     name = "scheduler"
     intents = ["set-reminder", "set-timer", "cancel-reminder", "list-reminders"]
 
-    async def execute(self, intent: dict, context: dict) -> PluginResult:
+    async def execute(
+        self, intent: dict[str, Any], context: dict[str, Any]
+    ) -> PluginResult:
         action = intent.get("intent")
         logger.warning(f"[TODO Phase 8] Scheduler: {action}")
         return PluginResult(

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 import numpy as np
-
 from config.config_loader import JarvisConfig
 from core.logger import get_logger
 
@@ -20,7 +23,7 @@ logger = get_logger(__name__)
 class SpeechToTextVosk:
     """Vosk speech-to-text service with partial transcript callbacks."""
 
-    def __init__(self, config: JarvisConfig):
+    def __init__(self, config: JarvisConfig) -> None:
         self._config = config
         if vosk is None:
             raise RuntimeError("vosk is not installed. Run `pip install vosk`")
@@ -46,8 +49,9 @@ class SpeechToTextVosk:
 
     async def transcribe(
         self,
-        audio_data: np.ndarray | bytes,
+        audio_data: NDArray[Any] | bytes,
         on_chunk: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        finalize: bool = True,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
 
@@ -56,13 +60,20 @@ class SpeechToTextVosk:
         else:
             audio = audio_data
 
-        if audio.size == 0:
+        if audio.size == 0 and finalize:
+            final_result = json.loads(self.recognizer.FinalResult())
+            logger.info(f"Vosk FinalResult raw: {final_result}")
+            final_text = (final_result.get("text") or "").strip()
             return {
-                "text": "",
-                "confidence": 0.05,
-                "language": self._config.stt.language if self._config.stt.language != "auto" else "unknown",
+                "text": final_text,
+                "confidence": 0.82 if final_text else 0.05,
+                "language": self._config.stt.language
+                if self._config.stt.language != "auto"
+                else "unknown",
                 "duration_seconds": 0.0,
             }
+        elif audio.size == 0:
+            return {"text": "", "confidence": 0.0, "duration_seconds": 0.0}
 
         collected_final: list[str] = []
         frame_size = int(self._config.audio.sample_rate * 0.03)  # 30ms frames
@@ -91,26 +102,39 @@ class SpeechToTextVosk:
                 if partial_text:
                     await on_chunk(
                         {
-                            "text": (" ".join(collected_final) + " " + partial_text).strip(),
+                            "text": (
+                                " ".join(collected_final) + " " + partial_text
+                            ).strip(),
                             "chunk": partial_text,
                             "is_final": False,
                         }
                     )
 
-        final_result = json.loads(self.recognizer.FinalResult())
-        final_text = (final_result.get("text") or "").strip()
-        if final_text:
-            collected_final.append(final_text)
-
         transcript = " ".join(collected_final).strip()
+
+        if finalize:
+            final_result = json.loads(self.recognizer.FinalResult())
+            final_text = (final_result.get("text") or "").strip()
+            if final_text:
+                logger.info(f"Vosk FinalResult: {final_text}")
+                if transcript:
+                    transcript = f"{transcript} {final_text}"
+                else:
+                    transcript = final_text
+
         duration = time.perf_counter() - started_at
 
-        if on_chunk is not None and transcript:
+        if on_chunk is not None and transcript and finalize:
             await on_chunk({"text": transcript, "chunk": "", "is_final": True})
+
+        if transcript and finalize:
+            logger.info(f"Vosk transcription complete: {transcript} ({duration:.3f}s)")
 
         return {
             "text": transcript,
             "confidence": 0.82 if transcript else 0.05,
-            "language": self._config.stt.language if self._config.stt.language != "auto" else "unknown",
+            "language": self._config.stt.language
+            if self._config.stt.language != "auto"
+            else "unknown",
             "duration_seconds": round(duration, 3),
         }

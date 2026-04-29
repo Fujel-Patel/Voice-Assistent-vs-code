@@ -3,14 +3,21 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from brain.prompt_templates import JARVIS_SYSTEM_PROMPT
 from core.logger import get_logger
+
+from brain.prompt_templates import JARVIS_SYSTEM_PROMPT
 
 logger = get_logger(__name__)
 
 
 class ContextBuilder:
-    def __init__(self, short_term_memory, long_term_memory, token_budget: int = 4000, system_prompt: str | None = None) -> None:
+    def __init__(
+        self,
+        short_term_memory: Any,
+        long_term_memory: Any,
+        token_budget: int = 4000,
+        system_prompt: str | None = None,
+    ) -> None:
         self.short_term_memory = short_term_memory
         self.long_term_memory = long_term_memory
         self.token_budget = token_budget
@@ -41,7 +48,9 @@ class ContextBuilder:
         return f"{first} ... {last}"
 
     async def build_context(self, current_input: str) -> list[dict[str, str]]:
-        messages: list[dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": self.system_prompt}
+        ]
         used = self._estimate_tokens(self.system_prompt)
 
         preferences_task = self.long_term_memory.get_user_preferences()
@@ -61,7 +70,9 @@ class ContextBuilder:
             used += self._estimate_tokens(pref_text)
 
         if relevant:
-            context_blob = "\n".join(item["summary"] for item in relevant if item.get("summary"))
+            context_blob = "\n".join(
+                item["summary"] for item in relevant if item.get("summary")
+            )
             lt_text = f"Relevant past context:\n{context_blob}"
             messages.append({"role": "system", "content": lt_text})
             used += self._estimate_tokens(lt_text)
@@ -81,7 +92,9 @@ class ContextBuilder:
             content = turn.get("content", "")
             token_need = self._estimate_tokens(content)
             if used + token_need > self.token_budget:
-                content = self._truncate_message(content, max_tokens=max(32, self.token_budget - used))
+                content = self._truncate_message(
+                    content, max_tokens=max(32, self.token_budget - used)
+                )
                 token_need = self._estimate_tokens(content)
             if used + token_need > self.token_budget:
                 break
@@ -90,7 +103,9 @@ class ContextBuilder:
 
         user_tokens = self._estimate_tokens(current_input)
         if used + user_tokens > self.token_budget:
-            current_input = self._truncate_message(current_input, max_tokens=max(64, self.token_budget - used))
+            current_input = self._truncate_message(
+                current_input, max_tokens=max(64, self.token_budget - used)
+            )
         messages.append({"role": "user", "content": current_input})
         used += self._estimate_tokens(current_input)
 

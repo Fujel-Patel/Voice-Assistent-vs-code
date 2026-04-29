@@ -6,6 +6,7 @@ import pkgutil
 from typing import Any
 
 from core.logger import get_logger
+
 from plugins.base import JarvisPlugin, PluginResult
 
 logger = get_logger(__name__)
@@ -58,11 +59,15 @@ class PluginManager:
                     self.register(plugin)
                     discovered.append(plugin.name)
                 except Exception as exc:
-                    logger.warning(f"Failed to initialize plugin class {cls.__name__}: {exc}")
+                    logger.warning(
+                        f"Failed to initialize plugin class {cls.__name__}: {exc}"
+                    )
 
         return discovered
 
-    async def execute(self, intent_data: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    async def execute(
+        self, intent_data: dict[str, Any], context: dict[str, Any]
+    ) -> dict[str, Any]:
         intent_type = intent_data.get("type") or intent_data.get("intent")
         if not intent_type:
             return {"success": False, "message": "Missing intent type"}

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-import base64
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
+    from numpy.typing import NDArray
 from core.logger import get_logger
 from storage.db import get_db
+
 from .embeddings import SpeakerEmbeddingEngine
 
 logger = get_logger(__name__)
@@ -26,7 +29,7 @@ ENROLLMENT_PHRASES = [
 @dataclass
 class EnrollmentSession:
     user_id: str
-    embeddings: list[np.ndarray] = field(default_factory=list)
+    embeddings: list[NDArray[np.float32]] = field(default_factory=list)
     quality_scores: list[float] = field(default_factory=list)
 
 
@@ -61,7 +64,7 @@ class VoiceEnrollment:
     async def process_sample(
         self,
         user_id: str,
-        audio: np.ndarray,
+        audio: NDArray[np.float32],
         step: int,
         transcript_text: str | None = None,
         capture_duration_ms: int | None = None,
@@ -77,10 +80,10 @@ class VoiceEnrollment:
         if transcript_text is not None and not phrase_ok:
             return self._with_latency(
                 {
-                "step": step,
-                "success": False,
-                "complete": False,
-                "error": f"That does not match. Please say: {expected_phrase}",
+                    "step": step,
+                    "success": False,
+                    "complete": False,
+                    "error": f"That does not match. Please say: {expected_phrase}",
                 },
                 started_at=started_at,
                 capture_duration_ms=capture_duration_ms,
@@ -91,10 +94,10 @@ class VoiceEnrollment:
         if duration_seconds < 3.0:
             return self._with_latency(
                 {
-                "step": step,
-                "success": False,
-                "complete": False,
-                "error": "Please speak for at least 3 seconds",
+                    "step": step,
+                    "success": False,
+                    "complete": False,
+                    "error": "Please speak for at least 3 seconds",
                 },
                 started_at=started_at,
                 capture_duration_ms=capture_duration_ms,
@@ -102,10 +105,10 @@ class VoiceEnrollment:
         if quality_score < 0.35:
             return self._with_latency(
                 {
-                "step": step,
-                "success": False,
-                "complete": False,
-                "error": "Please try in a quieter environment",
+                    "step": step,
+                    "success": False,
+                    "complete": False,
+                    "error": "Please try in a quieter environment",
                 },
                 started_at=started_at,
                 capture_duration_ms=capture_duration_ms,
@@ -115,10 +118,10 @@ class VoiceEnrollment:
         if clipping > 32500:
             return self._with_latency(
                 {
-                "step": step,
-                "success": False,
-                "complete": False,
-                "error": "You are too close to the microphone",
+                    "step": step,
+                    "success": False,
+                    "complete": False,
+                    "error": "You are too close to the microphone",
                 },
                 started_at=started_at,
                 capture_duration_ms=capture_duration_ms,
@@ -128,7 +131,9 @@ class VoiceEnrollment:
         session.embeddings.append(embedding)
         session.quality_scores.append(quality_score)
 
-        profile_strength = int(round(sum(session.quality_scores) / len(session.quality_scores) * 100))
+        profile_strength = int(
+            round(sum(session.quality_scores) / len(session.quality_scores) * 100)
+        )
         complete = len(session.embeddings) >= len(ENROLLMENT_PHRASES)
 
         next_phrase = None
@@ -154,17 +159,19 @@ class VoiceEnrollment:
         if session is None or len(session.embeddings) < 3:
             return self._with_latency(
                 {
-                "success": False,
-                "message": "Enrollment requires 3 samples",
+                    "success": False,
+                    "message": "Enrollment requires 3 samples",
                 },
                 started_at=started_at,
             )
 
         profile_embedding = self.embedding_engine.average_embeddings(session.embeddings)
-        strength = float(sum(session.quality_scores) / len(session.quality_scores) * 100.0)
+        strength = float(
+            sum(session.quality_scores) / len(session.quality_scores) * 100.0
+        )
 
         encrypted = self._encrypt_embedding(profile_embedding)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         database = await get_db()
         await database.execute(
@@ -201,7 +208,7 @@ class VoiceEnrollment:
             started_at=started_at,
         )
 
-    async def get_profile_embedding(self, user_id: str) -> np.ndarray | None:
+    async def get_profile_embedding(self, user_id: str) -> NDArray[np.float32] | None:
         database = await get_db()
         rows = await database.fetch_all(
             "SELECT embedding FROM voice_profiles WHERE user_id = ? AND is_active = 1",
@@ -221,21 +228,23 @@ class VoiceEnrollment:
         overlap = len(expected_tokens & spoken_tokens)
         return overlap / max(1, len(expected_tokens)) >= 0.7
 
-    def _encrypt_embedding(self, embedding: np.ndarray) -> bytes:
+    def _encrypt_embedding(self, embedding: NDArray[np.float32]) -> bytes:
         payload = embedding.astype(np.float32).tobytes()
         fernet = self._fernet()
-        return fernet.encrypt(payload)
+        return bytes(fernet.encrypt(payload))
 
-    def _decrypt_embedding(self, encrypted_blob: bytes) -> np.ndarray:
+    def _decrypt_embedding(self, encrypted_blob: bytes) -> NDArray[np.float32]:
         fernet = self._fernet()
         plain = fernet.decrypt(encrypted_blob)
         return np.frombuffer(plain, dtype=np.float32)
 
-    def _fernet(self):
+    def _fernet(self) -> Fernet:
         try:
             from cryptography.fernet import Fernet
         except Exception as exc:  # pragma: no cover - dependency/runtime specific
-            raise RuntimeError(f"cryptography is required for voice profile encryption: {exc}")
+            raise RuntimeError(
+                f"cryptography is required for voice profile encryption: {exc}"
+            )
 
         key = os.getenv("JARVIS_AUTH_EMBEDDING_KEY")
         if key:

@@ -3,16 +3,19 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import socket
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import httpx
 
-try:
+if TYPE_CHECKING:
     from bs4 import BeautifulSoup
-except Exception:  # pragma: no cover
-    BeautifulSoup = None
+else:
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        BeautifulSoup = Any
 
 
 class WebFetcher:
@@ -26,7 +29,9 @@ class WebFetcher:
 
         headers = {"User-Agent": self.USER_AGENT}
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, follow_redirects=True
+            ) as client:
                 response = await client.get(url, headers=headers)
         except httpx.TimeoutException:
             return self._error_payload(url, "Page took too long to load")
@@ -52,11 +57,13 @@ class WebFetcher:
             "content": content,
             "url": str(response.url),
             "word_count": min(len(words), 5000),
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
             "truncated": truncated,
         }
 
-    async def fetch_multiple(self, urls: list[str], max_concurrent: int = 3) -> list[dict[str, Any]]:
+    async def fetch_multiple(
+        self, urls: list[str], max_concurrent: int = 3
+    ) -> list[dict[str, Any]]:
         unique_urls = list(dict.fromkeys(urls))[:3]
         semaphore = asyncio.Semaphore(max(1, max_concurrent))
 
@@ -97,7 +104,9 @@ class WebFetcher:
         if soup.title and soup.title.text:
             title = soup.title.text.strip()
 
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+        for tag in soup(
+            ["script", "style", "nav", "footer", "header", "aside", "noscript"]
+        ):
             tag.decompose()
 
         chunks: list[str] = []
@@ -158,7 +167,7 @@ class WebFetcher:
             "content": "",
             "url": url,
             "word_count": 0,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
             "error": message,
         }
 

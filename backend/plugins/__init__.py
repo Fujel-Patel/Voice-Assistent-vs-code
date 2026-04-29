@@ -5,9 +5,9 @@ from plugins.system_control import SystemControlPlugin
 from plugins.web_search import WebSearchPlugin
 
 __all__ = [
-	"AppLauncherPlugin",
-	"ScreenReaderPlugin",
-	"SystemControlPlugin",
-	"WebSearchPlugin",
-	"PluginManager",
+    "AppLauncherPlugin",
+    "ScreenReaderPlugin",
+    "SystemControlPlugin",
+    "WebSearchPlugin",
+    "PluginManager",
 ]

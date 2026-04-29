@@ -1,0 +1,7 @@
+backend/tests/__init__.py: error: Duplicate module named "tests" (also at "backend/tests/__init__.py")
+backend/tests/__init__.py: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#mapping-file-paths-to-modules for more info
+backend/tests/__init__.py: note: Common resolutions include:
+backend/tests/__init__.py: note:     a) using `--exclude` to avoid checking one of them,
+backend/tests/__init__.py: note:     b) adding `__init__.py` somewhere,
+backend/tests/__init__.py: note:     c) using `--explicit-package-bases` or adjusting `MYPYPATH`
+Found 1 error in 1 file (errors prevented further checking)

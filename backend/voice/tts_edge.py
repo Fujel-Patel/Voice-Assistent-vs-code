@@ -5,15 +5,20 @@ Uses the `edge-tts` package to stream audio from Microsoft's neural voices.
 Produces MP3 chunks that are decoded to PCM for the audio pipeline.
 No API key required. Requires internet connectivity.
 """
+
 from __future__ import annotations
 
 import asyncio
 import io
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
-
 from core.logger import get_logger
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
+    from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
@@ -31,18 +36,22 @@ VOICE_MAP = {
 class EdgeTTS:
     """Async TTS using Microsoft Edge neural voices via edge-tts package."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: JarvisConfig) -> None:
         self.config = config
         self._cancelled = False
         self.sample_rate = int(config.tts.sample_rate)
         # Pick voice from config or default to a deep male voice
-        voice_key = (config.tts.edge_voice if hasattr(config.tts, "edge_voice") else "").strip().lower()
+        voice_key = (
+            (config.tts.edge_voice if hasattr(config.tts, "edge_voice") else "")
+            .strip()
+            .lower()
+        )
         self.voice = VOICE_MAP.get(voice_key, voice_key or VOICE_MAP["jarvis"])
 
     def cancel(self) -> None:
         self._cancelled = True
 
-    async def synthesize(self, text: str) -> np.ndarray:
+    async def synthesize(self, text: str) -> NDArray[np.float32]:
         """Synthesize full text to numpy float32 PCM array."""
         self._cancelled = False
         if not text.strip():
@@ -102,7 +111,7 @@ class EdgeTTS:
             logger.warning(f"Edge-TTS stream failed: {exc}")
             raise
 
-    def _decode_mp3(self, mp3_bytes: bytes) -> np.ndarray:
+    def _decode_mp3(self, mp3_bytes: bytes) -> NDArray[np.float32]:
         """Decode MP3 bytes to float32 numpy array."""
         try:
             import soundfile as sf
@@ -112,7 +121,7 @@ class EdgeTTS:
                 audio = audio.mean(axis=1)
             if sr != self.sample_rate:
                 audio = self._resample(audio, sr, self.sample_rate)
-            return audio.astype(np.float32)
+            return cast("NDArray[np.float32]", audio.astype(np.float32))
         except Exception:
             # soundfile can't decode MP3 directly on some systems, try pydub fallback
             try:
@@ -126,7 +135,9 @@ class EdgeTTS:
                 logger.warning(f"MP3 decode failed with both backends: {exc2}")
                 return np.zeros(1, dtype=np.float32)
 
-    def _resample(self, audio: np.ndarray, src_rate: int, dst_rate: int) -> np.ndarray:
+    def _resample(
+        self, audio: NDArray[np.float32], src_rate: int, dst_rate: int
+    ) -> NDArray[np.float32]:
         if src_rate == dst_rate or audio.size == 0:
             return audio
         duration = len(audio) / float(src_rate)

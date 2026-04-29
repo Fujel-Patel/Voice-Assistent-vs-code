@@ -3,21 +3,25 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from io import BytesIO
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import soundfile as sf
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+    from piper import PiperVoice
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class PiperTTS:
-    def __init__(self, config) -> None:
+    def __init__(self, config: Any) -> None:
         self.config = config
         self.sample_rate = int(config.tts.sample_rate)
         self._cancelled = False
-        self._voice = None
+        self._voice: PiperVoice | None = None
         self._voice_model_name = ""
         self.available = self._module_available()
 
@@ -32,24 +36,36 @@ class PiperTTS:
     def cancel(self) -> None:
         self._cancelled = True
 
-    def _ensure_voice(self):
+    def _ensure_voice(self) -> PiperVoice:
         if not self.available:
-            raise RuntimeError("piper-tts is not installed. Run `pip install piper-tts`")
+            raise RuntimeError(
+                "piper-tts is not installed. Run `pip install piper-tts`"
+            )
 
         import os
         from pathlib import Path
 
-        model_name_cfg = str(getattr(self.config.tts, "piper_model", "") or "en_US-lessac-medium.onnx").strip()
+        model_name_cfg = str(
+            getattr(self.config.tts, "piper_model", "") or "en_US-lessac-medium.onnx"
+        ).strip()
 
         if self._voice is not None and self._voice_model_name == model_name_cfg:
             return self._voice
 
         # Search locations in order
         search_paths = [
-            Path(model_name_cfg),                                          # absolute path as given
-            Path.home() / ".jarvis" / "models" / "tts" / model_name_cfg,  # download_models.py location
-            Path.home() / ".local" / "share" / "piper" / model_name_cfg,  # piper default
-            Path("/usr/share/piper/voices") / model_name_cfg,             # system install
+            Path(model_name_cfg),  # absolute path as given
+            Path.home()
+            / ".jarvis"
+            / "models"
+            / "tts"
+            / model_name_cfg,  # download_models.py location
+            Path.home()
+            / ".local"
+            / "share"
+            / "piper"
+            / model_name_cfg,  # piper default
+            Path("/usr/share/piper/voices") / model_name_cfg,  # system install
         ]
 
         resolved_path = None
@@ -72,12 +88,12 @@ class PiperTTS:
         self._voice_model_name = model_name_cfg
         return self._voice
 
-    async def synthesize(self, text: str) -> np.ndarray:
+    async def synthesize(self, text: str) -> NDArray[np.float32]:
         self._cancelled = False
         if not text.strip():
             return np.zeros(1, dtype=np.float32)
 
-        def _render() -> tuple[np.ndarray, int]:
+        def _render() -> tuple[NDArray[np.float32], int]:
             voice = self._ensure_voice()
             wav_buffer = BytesIO()
             speaker_id = getattr(self.config.tts, "piper_speaker_id", None)
@@ -86,14 +102,19 @@ class PiperTTS:
             import wave
 
             with wave.open(wav_buffer, "wb") as wav_file:
-                voice.synthesize(
+                voice_any: Any = voice
+                voice_any.synthesize(
                     text=text,
                     wav_file=wav_file,
                     speaker_id=speaker_id,
                     length_scale=length_scale,
-                    noise_scale=float(getattr(self.config.tts, "piper_noise_scale", 0.667)),
+                    noise_scale=float(
+                        getattr(self.config.tts, "piper_noise_scale", 0.667)
+                    ),
                     noise_w=float(getattr(self.config.tts, "piper_noise_w", 0.8)),
-                    sentence_silence=float(getattr(self.config.tts, "piper_sentence_silence", 0.0)),
+                    sentence_silence=float(
+                        getattr(self.config.tts, "piper_sentence_silence", 0.0)
+                    ),
                 )
 
             wav_buffer.seek(0)
@@ -117,7 +138,9 @@ class PiperTTS:
             yield pcm[i : i + chunk_size]
             await asyncio.sleep(0)
 
-    def _resample(self, audio: np.ndarray, src_rate: int, dst_rate: int) -> np.ndarray:
+    def _resample(
+        self, audio: NDArray[np.float32], src_rate: int, dst_rate: int
+    ) -> NDArray[np.float32]:
         if src_rate == dst_rate or audio.size == 0:
             return audio
         duration = len(audio) / float(src_rate)

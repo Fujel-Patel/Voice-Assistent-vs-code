@@ -4,7 +4,9 @@ import asyncio
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
+psutil: Any
 try:
     import psutil
 except Exception:  # pragma: no cover - handled gracefully at runtime
@@ -12,6 +14,7 @@ except Exception:  # pragma: no cover - handled gracefully at runtime
 
 from core.logger import get_logger
 from os_bridge.platform_detect import detect_platform
+
 from plugins.base import JarvisPlugin, PluginResult
 
 logger = get_logger(__name__)
@@ -31,11 +34,13 @@ class AppLauncherPlugin(JarvisPlugin):
         "spotify": ["spotify", "music player"],
     }
 
-    def _extract_intent_type(self, intent: dict) -> str:
+    def _extract_intent_type(self, intent: dict[str, Any]) -> str:
         return str(intent.get("type") or intent.get("intent") or "")
 
-    def _extract_app_name(self, intent: dict) -> str:
-        params = intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+    def _extract_app_name(self, intent: dict[str, Any]) -> str:
+        params = (
+            intent.get("params", {}) if isinstance(intent.get("params"), dict) else {}
+        )
         return str(
             params.get("app_name")
             or params.get("app")
@@ -66,7 +71,9 @@ class AppLauncherPlugin(JarvisPlugin):
             result.add(alias.lower())
         return list(result)
 
-    async def execute(self, intent: dict, context: dict) -> PluginResult:
+    async def execute(
+        self, intent: dict[str, Any], context: dict[str, Any]
+    ) -> PluginResult:
         intent_type = self._extract_intent_type(intent)
         app_name = self._extract_app_name(intent)
 
@@ -77,26 +84,42 @@ class AppLauncherPlugin(JarvisPlugin):
         if intent_type == "list-apps":
             return await self._list_running_apps()
 
-        return PluginResult(success=False, output=f"Unsupported app action: {intent_type}", error="unsupported_action")
+        return PluginResult(
+            success=False,
+            output=f"Unsupported app action: {intent_type}",
+            error="unsupported_action",
+        )
 
     async def _open_app(self, app_name: str) -> PluginResult:
         if not app_name:
-            return PluginResult(success=False, output="Please provide an app name.", error="missing_app_name")
+            return PluginResult(
+                success=False,
+                output="Please provide an app name.",
+                error="missing_app_name",
+            )
 
         command = self.resolve_alias(app_name)
-        running = await asyncio.to_thread(self._find_processes, self._candidate_names(command))
+        running = await asyncio.to_thread(
+            self._find_processes, self._candidate_names(command)
+        )
         if running:
             return PluginResult(
                 success=True,
                 output=f"{app_name} is already running.",
-                data={"app_name": app_name, "resolved_command": command, "already_running": True},
+                data={
+                    "app_name": app_name,
+                    "resolved_command": command,
+                    "already_running": True,
+                },
             )
 
         platform_info = detect_platform()
         try:
             await asyncio.to_thread(self._launch_command, command, platform_info.os)
             await asyncio.sleep(0.4)
-            started = await asyncio.to_thread(self._find_processes, self._candidate_names(command))
+            started = await asyncio.to_thread(
+                self._find_processes, self._candidate_names(command)
+            )
             return PluginResult(
                 success=True,
                 output=f"Opening {app_name}.",
@@ -124,23 +147,43 @@ class AppLauncherPlugin(JarvisPlugin):
 
     def _launch_command(self, command: str, os_name: str) -> None:
         if os_name == "windows":
-            subprocess.Popen(["cmd", "/c", "start", "", command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", command],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             return
         if os_name == "macos":
-            subprocess.Popen(["open", "-a", command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["open", "-a", command],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             return
 
         try:
-            subprocess.Popen([command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                [command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
         except FileNotFoundError:
-            subprocess.Popen(["xdg-open", command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["xdg-open", command],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
     async def _close_app(self, app_name: str) -> PluginResult:
         if not app_name:
-            return PluginResult(success=False, output="Please provide an app name.", error="missing_app_name")
+            return PluginResult(
+                success=False,
+                output="Please provide an app name.",
+                error="missing_app_name",
+            )
 
         command = self.resolve_alias(app_name)
-        processes = await asyncio.to_thread(self._find_processes, self._candidate_names(command))
+        processes = await asyncio.to_thread(
+            self._find_processes, self._candidate_names(command)
+        )
         if not processes:
             return PluginResult(
                 success=False,
@@ -199,35 +242,46 @@ class AppLauncherPlugin(JarvisPlugin):
                 pname = (proc.info.get("name") or "").lower()
                 pexe = Path(proc.info.get("exe") or "").name.lower()
                 cmdline = " ".join(proc.info.get("cmdline") or []).lower()
-                if any(token and (token in pname or token in pexe or token in cmdline) for token in names):
+                if any(
+                    token and (token in pname or token in pexe or token in cmdline)
+                    for token in names
+                ):
                     matched.append(proc)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
         return matched
 
-    def _iter_gui_processes(self) -> list[dict]:
+    def _iter_gui_processes(self) -> list[dict[str, Any]]:
         if psutil is None:
             return []
 
-        entries: list[dict] = []
+        entries: list[dict[str, Any]] = []
         for proc in psutil.process_iter(["pid", "name", "username", "terminal"]):
             try:
                 terminal = proc.info.get("terminal")
                 if terminal:
                     continue
-                entries.append({
-                    "pid": proc.info.get("pid"),
-                    "name": proc.info.get("name") or "unknown",
-                    "username": proc.info.get("username") or "unknown",
-                })
+                entries.append(
+                    {
+                        "pid": proc.info.get("pid"),
+                        "name": proc.info.get("name") or "unknown",
+                        "username": proc.info.get("username") or "unknown",
+                    }
+                )
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
         return entries
 
-    def get_capabilities(self) -> list[dict]:
+    def get_capabilities(self) -> list[dict[str, Any]]:
         return [
-            {"intent": "open-app", "description": "Launch desktop applications by friendly name"},
-            {"intent": "close-app", "description": "Close running applications gracefully"},
+            {
+                "intent": "open-app",
+                "description": "Launch desktop applications by friendly name",
+            },
+            {
+                "intent": "close-app",
+                "description": "Close running applications gracefully",
+            },
             {"intent": "list-apps", "description": "List running GUI applications"},
         ]

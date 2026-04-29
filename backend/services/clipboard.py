@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Jarvis Services — Clipboard Integration Stub
 =============================================
@@ -17,7 +19,8 @@ class ClipboardService:
     def read(self) -> str:
         """Get the current clipboard content."""
         try:
-            return pyperclip.paste()
+            content = pyperclip.paste()
+            return str(content) if content is not None else ""
         except Exception as e:
             logger.error(f"Clipboard read error: {e}")
             return ""

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from core.event_bus import EventBus
 from voice.state_machine import VoicePipeline, VoiceState
 
 
 @pytest.mark.asyncio
-async def test_valid_transitions(event_bus: EventBus):
+async def test_valid_transitions(event_bus: EventBus) -> None:
     pipeline = VoicePipeline(event_bus=event_bus)
 
     await pipeline.transition(VoiceState.WAKE_DETECTED)
@@ -17,7 +18,7 @@ async def test_valid_transitions(event_bus: EventBus):
 
 
 @pytest.mark.asyncio
-async def test_invalid_transition(event_bus: EventBus):
+async def test_invalid_transition(event_bus: EventBus) -> None:
     pipeline = VoicePipeline(event_bus=event_bus)
 
     with pytest.raises(ValueError):
@@ -25,28 +26,32 @@ async def test_invalid_transition(event_bus: EventBus):
 
 
 @pytest.mark.asyncio
-async def test_transition_if_state_success(event_bus: EventBus):
+async def test_transition_if_state_success(event_bus: EventBus) -> None:
     pipeline = VoicePipeline(event_bus=event_bus)
 
-    transitioned = await pipeline.transition_if_state(VoiceState.IDLE, VoiceState.THINKING)
+    transitioned = await pipeline.transition_if_state(
+        VoiceState.IDLE, VoiceState.THINKING
+    )
 
     assert transitioned is True
     assert pipeline.state == VoiceState.THINKING
 
 
 @pytest.mark.asyncio
-async def test_transition_if_state_mismatch(event_bus: EventBus):
+async def test_transition_if_state_mismatch(event_bus: EventBus) -> None:
     pipeline = VoicePipeline(event_bus=event_bus)
     await pipeline.transition(VoiceState.WAKE_DETECTED)
 
-    transitioned = await pipeline.transition_if_state(VoiceState.IDLE, VoiceState.THINKING)
+    transitioned = await pipeline.transition_if_state(
+        VoiceState.IDLE, VoiceState.THINKING
+    )
 
     assert transitioned is False
     assert pipeline.state == VoiceState.WAKE_DETECTED
 
 
 @pytest.mark.asyncio
-async def test_interrupt_while_speaking(event_bus: EventBus):
+async def test_interrupt_while_speaking(event_bus: EventBus) -> None:
     pipeline = VoicePipeline(event_bus=event_bus)
 
     await pipeline.transition(VoiceState.WAKE_DETECTED)
@@ -61,10 +66,10 @@ async def test_interrupt_while_speaking(event_bus: EventBus):
 
 
 @pytest.mark.asyncio
-async def test_state_change_event(event_bus: EventBus):
+async def test_state_change_event(event_bus: EventBus) -> None:
     seen = []
 
-    async def _handler(payload: dict):
+    async def _handler(payload: dict[str, Any]) -> None:
         seen.append(payload)
 
     event_bus.subscribe("voice_state_change", _handler)

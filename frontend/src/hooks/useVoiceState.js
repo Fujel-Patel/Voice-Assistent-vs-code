@@ -16,6 +16,20 @@ export function useVoiceState(websocket) {
 
   const getChunk = (payload) => payload?.chunk || payload?.text_chunk || payload?.word || payload?.text || ''
 
+  const alwaysOnSpeaker = useAppStore((state) => state.alwaysOnSpeaker)
+  const voiceState = useAppStore((state) => state.voiceState)
+  const connectionState = useAppStore((state) => state.connectionState)
+
+  // Global auto-restart logic for Always-on Mic
+  useEffect(() => {
+    if (alwaysOnSpeaker && voiceState === 'idle' && connectionState === 'connected') {
+      const timer = setTimeout(() => {
+        websocket?.sendMessage({ type: 'start_listening', payload: { source: 'always_on' } })
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [alwaysOnSpeaker, voiceState, connectionState, websocket])
+
   useEffect(() => {
     if (!websocket) return
 

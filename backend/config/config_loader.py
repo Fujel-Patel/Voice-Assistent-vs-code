@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -9,7 +9,6 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-
 
 CONFIG_DIR = Path(__file__).parent
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "default.yaml"
@@ -277,7 +276,9 @@ def load_config() -> JarvisConfig:
     if os.getenv("OLLAMA_BASE_URL"):
         merged["provider_keys"]["ollama_base_url"] = os.getenv("OLLAMA_BASE_URL")
     if os.getenv("OPENROUTER_BASE_URL"):
-        merged["provider_keys"]["openrouter_base_url"] = os.getenv("OPENROUTER_BASE_URL")
+        merged["provider_keys"]["openrouter_base_url"] = os.getenv(
+            "OPENROUTER_BASE_URL"
+        )
     if os.getenv("GROQ_BASE_URL"):
         merged["provider_keys"]["groq_base_url"] = os.getenv("GROQ_BASE_URL")
     if os.getenv("GEMINI_BASE_URL"):
@@ -297,7 +298,9 @@ def save_all(settings: dict[str, Any]) -> JarvisConfig:
     current_user = _load_yaml(USER_CONFIG_PATH)
     merged_user = _deep_merge(current_user, settings)
     USER_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    USER_CONFIG_PATH.write_text(yaml.safe_dump(merged_user, sort_keys=False), encoding="utf-8")
+    USER_CONFIG_PATH.write_text(
+        yaml.safe_dump(merged_user, sort_keys=False), encoding="utf-8"
+    )
 
     load_config.cache_clear()
     return load_config()
@@ -308,7 +311,9 @@ def save_setting(key: str, value: Any) -> JarvisConfig:
     user_cfg = _load_yaml(USER_CONFIG_PATH)
     _set_nested(user_cfg, path, value)
     USER_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    USER_CONFIG_PATH.write_text(yaml.safe_dump(user_cfg, sort_keys=False), encoding="utf-8")
+    USER_CONFIG_PATH.write_text(
+        yaml.safe_dump(user_cfg, sort_keys=False), encoding="utf-8"
+    )
 
     load_config.cache_clear()
     return load_config()

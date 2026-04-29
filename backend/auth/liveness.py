@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class LivenessDetector:
@@ -26,7 +29,7 @@ class LivenessDetector:
 
     def verify_challenge(
         self,
-        audio: np.ndarray,
+        audio: NDArray[Any],
         expected_phrase: str,
         transcript_text: str | None = None,
         response_latency_seconds: float | None = None,
@@ -41,7 +44,9 @@ class LivenessDetector:
         timing_natural = 0.5 < response_latency_seconds <= 5.0
         replay_risk = self._replay_risk(audio)
         human_like_duration = audio_duration_seconds >= 1.5
-        passed = matched and timing_natural and (replay_risk < 0.95 or human_like_duration)
+        passed = (
+            matched and timing_natural and (replay_risk < 0.95 or human_like_duration)
+        )
 
         return {
             "passed": passed,
@@ -70,7 +75,7 @@ class LivenessDetector:
         score = overlap / max(1, len(set(expected_tokens)))
         return score >= 0.75
 
-    def _replay_risk(self, audio: np.ndarray) -> float:
+    def _replay_risk(self, audio: NDArray[Any]) -> float:
         waveform = np.asarray(audio, dtype=np.float32)
         if waveform.ndim > 1:
             waveform = np.mean(waveform, axis=1)
@@ -83,6 +88,9 @@ class LivenessDetector:
 
         # Low dynamic range and very flat envelopes are suspicious.
         frame = max(1, int(len(waveform) / 50))
-        envelope = [float(np.mean(np.abs(waveform[i : i + frame]))) for i in range(0, len(waveform), frame)]
+        envelope = [
+            float(np.mean(np.abs(waveform[i : i + frame])))
+            for i in range(0, len(waveform), frame)
+        ]
         variation = float(np.std(envelope))
         return float(np.clip(1.0 - (variation * 15.0), 0.0, 1.0))

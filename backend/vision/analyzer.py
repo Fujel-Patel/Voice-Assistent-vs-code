@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import hashlib
 import time
 from collections import OrderedDict, deque
 from io import BytesIO
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 import httpx
-
 from config.config_loader import load_config
 from core.logger import get_logger
 
@@ -34,10 +35,12 @@ class ScreenAnalyzer:
         self.model = cfg.brain.models.claude
         self.base_url = "https://api.anthropic.com/v1/messages"
 
-    async def describe_screen(self, image) -> str:
-        return await self.answer_about_screen(image, "Describe what is visible on this screen.")
+    async def describe_screen(self, image: PILImage) -> str:
+        return await self.answer_about_screen(
+            image, "Describe what is visible on this screen."
+        )
 
-    async def answer_about_screen(self, image, question: str) -> str:
+    async def answer_about_screen(self, image: PILImage, question: str) -> str:
         await self._check_rate_limit()
         image_hash = self._image_hash(image)
         cache_key = f"{image_hash}:{question.strip().lower()}"
@@ -51,12 +54,12 @@ class ScreenAnalyzer:
             self._cache.popitem(last=False)
         return answer
 
-    async def extract_structured_data(self, image) -> dict[str, Any]:
+    async def extract_structured_data(self, image: PILImage) -> dict[str, Any]:
         prompt = "Extract structured content from this screen as JSON with keys: app, title, errors, lists, forms."
         answer = await self.answer_about_screen(image, prompt)
         return {"raw": answer}
 
-    async def find_element(self, image, description: str) -> dict[str, Any]:
+    async def find_element(self, image: PILImage, description: str) -> dict[str, Any]:
         prompt = (
             "Find this UI element and describe where it is located: "
             f"{description}. Return concise location clues and nearby labels."
@@ -72,9 +75,11 @@ class ScreenAnalyzer:
             raise RuntimeError("Screen analysis rate limit reached (5 per minute)")
         self._timestamps.append(now)
 
-    async def _send_vision_prompt(self, image, question: str) -> str:
+    async def _send_vision_prompt(self, image: PILImage, question: str) -> str:
         if not self.api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not configured for screen analysis")
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY is not configured for screen analysis"
+            )
 
         logger.warning("Sending screenshot to Claude Vision for analysis")
         encoded = self._encode_image(image)
@@ -87,7 +92,10 @@ class ScreenAnalyzer:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": f"{SCREEN_ANALYSIS_PROMPT}\n\nQuestion: {question}"},
+                        {
+                            "type": "text",
+                            "text": f"{SCREEN_ANALYSIS_PROMPT}\n\nQuestion: {question}",
+                        },
                         {
                             "type": "image",
                             "source": {
@@ -110,7 +118,9 @@ class ScreenAnalyzer:
         async with httpx.AsyncClient(timeout=45.0) as client:
             response = await client.post(self.base_url, headers=headers, json=payload)
             if response.status_code >= 400:
-                raise RuntimeError(f"Claude Vision API error: {response.status_code} {response.text}")
+                raise RuntimeError(
+                    f"Claude Vision API error: {response.status_code} {response.text}"
+                )
             data = response.json()
 
         chunks: list[str] = []
@@ -121,10 +131,10 @@ class ScreenAnalyzer:
 
         return "\n".join(chunks).strip()
 
-    def _encode_image(self, image) -> str:
+    def _encode_image(self, image: PILImage) -> str:
         with BytesIO() as buf:
             image.save(buf, format="JPEG", quality=85, optimize=True)
             return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    def _image_hash(self, image) -> str:
+    def _image_hash(self, image: PILImage) -> str:
         return hashlib.sha256(image.tobytes()).hexdigest()

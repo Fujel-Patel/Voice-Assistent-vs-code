@@ -1,8 +1,16 @@
-from __future__ import annotations
+from typing import TYPE_CHECKING, Any
 
 import pytest
-Image = pytest.importorskip("PIL.Image", reason="Pillow is required for vision tests")
-ImageDraw = pytest.importorskip("PIL.ImageDraw", reason="Pillow is required for vision tests")
+
+if TYPE_CHECKING:
+    from PIL import Image, ImageDraw
+else:
+    Image = pytest.importorskip(
+        "PIL.Image", reason="Pillow is required for vision tests"
+    )
+    ImageDraw = pytest.importorskip(
+        "PIL.ImageDraw", reason="Pillow is required for vision tests"
+    )
 
 from plugins.screen_reader import ScreenReaderPlugin
 from vision.analyzer import ScreenAnalyzer
@@ -19,7 +27,7 @@ def sample_image() -> Image.Image:
 
 
 @pytest.mark.asyncio
-async def test_screenshot_capture(mocker, sample_image) -> None:
+async def test_screenshot_capture(mocker: Any, sample_image: Image.Image) -> None:
     capture = ScreenCapture(save_by_default=False)
     mocker.patch.object(capture, "capture_full", return_value=sample_image)
 
@@ -27,7 +35,7 @@ async def test_screenshot_capture(mocker, sample_image) -> None:
     assert image.size == sample_image.size
 
 
-def test_multi_monitor_list(mocker) -> None:
+def test_multi_monitor_list(mocker: Any) -> None:
     class FakeMSS:
         monitors = [
             {},
@@ -35,11 +43,11 @@ def test_multi_monitor_list(mocker) -> None:
             {"left": 1920, "top": 0, "width": 1920, "height": 1080},
         ]
 
-        def __enter__(self):
+        def __enter__(self) -> FakeMSS:
             return self
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            pass
 
     mocker.patch("vision.capture.mss.mss", return_value=FakeMSS())
 
@@ -50,16 +58,18 @@ def test_multi_monitor_list(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ocr_text_extraction(mocker, sample_image) -> None:
+async def test_ocr_text_extraction(mocker: Any, sample_image: Image.Image) -> None:
     engine = OCREngine()
-    mocker.patch.object(engine, "_extract_text_sync", return_value="Error: File not found")
+    mocker.patch.object(
+        engine, "_extract_text_sync", return_value="Error: File not found"
+    )
 
     text = await engine.extract_text(sample_image)
     assert "Error" in text
 
 
 @pytest.mark.asyncio
-async def test_ocr_empty_image(mocker, sample_image) -> None:
+async def test_ocr_empty_image(mocker: Any, sample_image: Image.Image) -> None:
     engine = OCREngine()
     mocker.patch.object(engine, "_extract_text_sync", return_value="")
     text = await engine.extract_text(sample_image)
@@ -67,27 +77,35 @@ async def test_ocr_empty_image(mocker, sample_image) -> None:
 
 
 @pytest.mark.asyncio
-async def test_claude_vision_analysis(mocker, sample_image) -> None:
+async def test_claude_vision_analysis(mocker: Any, sample_image: Image.Image) -> None:
     analyzer = ScreenAnalyzer()
-    mocker.patch.object(analyzer, "_send_vision_prompt", return_value="VS Code showing a Python error")
+    mocker.patch.object(
+        analyzer, "_send_vision_prompt", return_value="VS Code showing a Python error"
+    )
 
     text = await analyzer.describe_screen(sample_image)
     assert "error" in text.lower()
 
 
 @pytest.mark.asyncio
-async def test_screen_reader_plugin(mocker, sample_image) -> None:
+async def test_screen_reader_plugin(mocker: Any, sample_image: Image.Image) -> None:
     plugin = ScreenReaderPlugin()
-    mocker.patch.object(plugin.capture, "capture_active_window", return_value=sample_image)
-    mocker.patch.object(plugin.analyzer, "describe_screen", return_value="Browser with docs page")
+    mocker.patch.object(
+        plugin.capture, "capture_active_window", return_value=sample_image
+    )
+    mocker.patch.object(
+        plugin.analyzer, "describe_screen", return_value="Browser with docs page"
+    )
 
-    result = await plugin.execute({"type": "screen-read", "params": {"action": "describe"}}, context={})
+    result = await plugin.execute(
+        {"type": "screen-read", "params": {"action": "describe"}}, context={}
+    )
     assert result.success is True
     assert "Browser" in result.output
 
 
 @pytest.mark.asyncio
-async def test_rate_limiting(sample_image) -> None:
+async def test_rate_limiting(sample_image: Image.Image) -> None:
     analyzer = ScreenAnalyzer(max_per_minute=1)
     analyzer._timestamps.append(__import__("time").time())
 

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 
 class ShortTermMemory:
@@ -17,12 +18,14 @@ class ShortTermMemory:
         self._lock = asyncio.Lock()
         self._on_rollover = on_rollover
 
-    async def add_turn(self, role: str, content: str, metadata: dict[str, Any] | None = None) -> None:
+    async def add_turn(
+        self, role: str, content: str, metadata: dict[str, Any] | None = None
+    ) -> None:
         metadata = metadata or {}
         turn = {
             "role": role,
             "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "intent": metadata.get("intent"),
             "tokens": int(metadata.get("tokens", max(1, len(content) // 4))),
         }

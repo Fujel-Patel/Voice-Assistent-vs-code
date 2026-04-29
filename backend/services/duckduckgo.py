@@ -77,14 +77,14 @@ class DuckDuckGoSearch:
 
         try:
             with DDGS() as ddgs:
-                result = ddgs.answers(query)
-                if not result:
+                results = list(ddgs.text(query, max_results=1))
+                if not results:
                     return None
-                first = result[0] if isinstance(result, list) else result
+                first = results[0]
                 return {
-                    "answer": first.get("text", ""),
-                    "source": first.get("source", "DuckDuckGo"),
-                    "type": first.get("topic", "instant_answer"),
+                    "answer": first.get("body", ""),
+                    "source": first.get("href", "DuckDuckGo"),
+                    "type": "search_result",
                 }
         except Exception:
             return None

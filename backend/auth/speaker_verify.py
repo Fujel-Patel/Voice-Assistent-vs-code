@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 import numpy as np
-
 from core.logger import get_logger
 from storage.db import get_db
+
 from .embeddings import SpeakerEmbeddingEngine
 from .enrollment import VoiceEnrollment
 
@@ -46,14 +49,20 @@ class SpeakerVerifier:
         self._session_cache: dict[str, VerificationCache] = {}
         self._failure_count: dict[str, int] = {}
 
-    async def verify(self, audio: np.ndarray, user_id: str = "default_user", sample_rate: int = 16000) -> dict[str, Any]:
+    async def verify(
+        self,
+        audio: NDArray[np.float32],
+        user_id: str = "default_user",
+        sample_rate: int = 16000,
+    ) -> dict[str, Any]:
         cached = self._session_cache.get(user_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if (
             cached
             and cached.verified
             and cached.expires_at > now
-            and (now - cached.created_at) <= timedelta(minutes=self._session_timeout_minutes)
+            and (now - cached.created_at)
+            <= timedelta(minutes=self._session_timeout_minutes)
         ):
             return {
                 "verified": cached.verified,
@@ -76,8 +85,12 @@ class SpeakerVerifier:
                 "pin_required": False,
             }
 
-        live_embedding = self.embedding_engine.create_embedding(audio, sample_rate=sample_rate)
-        confidence = self.embedding_engine.compare_embeddings(profile_embedding, live_embedding)
+        live_embedding = self.embedding_engine.create_embedding(
+            audio, sample_rate=sample_rate
+        )
+        confidence = self.embedding_engine.compare_embeddings(
+            profile_embedding, live_embedding
+        )
 
         threshold = self.current_threshold
         quality = self.embedding_engine.quality_score(audio, sample_rate=sample_rate)
@@ -85,7 +98,9 @@ class SpeakerVerifier:
             threshold = max(0.65, threshold - 0.05)
 
         verified = confidence >= threshold
-        self._failure_count[user_id] = 0 if verified else self._failure_count.get(user_id, 0) + 1
+        self._failure_count[user_id] = (
+            0 if verified else self._failure_count.get(user_id, 0) + 1
+        )
 
         if verified:
             self._session_cache[user_id] = VerificationCache(
@@ -97,7 +112,12 @@ class SpeakerVerifier:
         else:
             self._session_cache.pop(user_id, None)
 
-        await self._log_attempt(user_id=user_id, confidence=confidence, verified=verified, threshold=threshold)
+        await self._log_attempt(
+            user_id=user_id,
+            confidence=confidence,
+            verified=verified,
+            threshold=threshold,
+        )
 
         return {
             "verified": verified,
@@ -122,8 +142,10 @@ class SpeakerVerifier:
     def reset_session(self, user_id: str = "default_user") -> None:
         self._session_cache.pop(user_id, None)
 
-    def mark_pin_verified(self, user_id: str = "default_user", confidence: float = 0.99) -> None:
-        now = datetime.now(timezone.utc)
+    def mark_pin_verified(
+        self, user_id: str = "default_user", confidence: float = 0.99
+    ) -> None:
+        now = datetime.now(UTC)
         self._session_cache[user_id] = VerificationCache(
             verified=True,
             confidence=confidence,
@@ -132,7 +154,9 @@ class SpeakerVerifier:
         )
         self._failure_count[user_id] = 0
 
-    async def _log_attempt(self, user_id: str, confidence: float, verified: bool, threshold: float) -> None:
+    async def _log_attempt(
+        self, user_id: str, confidence: float, verified: bool, threshold: float
+    ) -> None:
         database = await get_db()
         await database.execute(
             """
@@ -145,7 +169,7 @@ class SpeakerVerifier:
                 1 if verified else 0,
                 float(threshold),
                 "voice",
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         await database.commit()

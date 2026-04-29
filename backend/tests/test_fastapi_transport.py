@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-
-from fastapi.testclient import TestClient
+from typing import Any
 
 import api.fastapi_app as fastapi_app
+import pytest
+from fastapi.testclient import TestClient
 
 
-def _install_fake_backend(monkeypatch):
-    calls = {"start": 0, "stop": 0, "messages": []}
+def _install_fake_backend(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    calls: dict[str, Any] = {"start": 0, "stop": 0, "messages": []}
 
     class FakeBackend:
         always_on_enabled = False
@@ -25,7 +26,7 @@ def _install_fake_backend(monkeypatch):
         async def stop(self) -> None:
             calls["stop"] += 1
 
-        async def _handle_client(self, adapter) -> None:
+        async def _handle_client(self, adapter: Any) -> None:
             # Send one message so websocket clients can verify end-to-end flow.
             await adapter.send(
                 json.dumps(
@@ -57,7 +58,7 @@ def _install_fake_backend(monkeypatch):
     return calls
 
 
-def test_fastapi_health_endpoint(monkeypatch) -> None:
+def test_fastapi_health_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_backend(monkeypatch)
 
     with TestClient(fastapi_app.app) as client:
@@ -70,17 +71,19 @@ def test_fastapi_health_endpoint(monkeypatch) -> None:
     assert payload["backend"]["websocket"] is True
 
 
-def test_fastapi_health_cors_for_vite_origin(monkeypatch) -> None:
+def test_fastapi_health_cors_for_vite_origin(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_backend(monkeypatch)
 
     with TestClient(fastapi_app.app) as client:
         response = client.get("/health", headers={"Origin": "http://localhost:5173"})
 
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    )
 
 
-def test_websocket_transport_ws_path(monkeypatch) -> None:
+def test_websocket_transport_ws_path(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _install_fake_backend(monkeypatch)
 
     with TestClient(fastapi_app.app) as client:
@@ -104,7 +107,7 @@ def test_websocket_transport_ws_path(monkeypatch) -> None:
     assert calls["messages"]
 
 
-def test_websocket_transport_root_alias(monkeypatch) -> None:
+def test_websocket_transport_root_alias(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_backend(monkeypatch)
 
     with TestClient(fastapi_app.app) as client:

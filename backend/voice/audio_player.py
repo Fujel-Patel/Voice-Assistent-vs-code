@@ -2,18 +2,24 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 from core.event_bus import EventBus
 from core.logger import get_logger
+
 from voice.audio_queue import AudioQueue
 
 logger = get_logger(__name__)
 
 
 class AudioPlayer:
-    def __init__(self, event_bus: EventBus, volume: float = 0.8, sample_rate: int = 22050) -> None:
+    def __init__(
+        self, event_bus: EventBus, volume: float = 0.8, sample_rate: int = 22050
+    ) -> None:
         self.event_bus = event_bus
         self.volume = max(0.0, min(1.0, volume))
         self.sample_rate = sample_rate
@@ -23,7 +29,9 @@ class AudioPlayer:
     def set_volume(self, volume: float) -> None:
         self.volume = max(0.0, min(1.0, volume))
 
-    async def play(self, audio_data: np.ndarray, sample_rate: int | None = None) -> None:
+    async def play(
+        self, audio_data: NDArray[np.float32], sample_rate: int | None = None
+    ) -> None:
         await self.event_bus.publish("audio_playback_started", {})
         sr = sample_rate or self.sample_rate
         try:
@@ -35,9 +43,13 @@ class AudioPlayer:
             await self.event_bus.publish("audio_playback_completed", {})
         except Exception as exc:
             logger.warning(f"Audio playback failed or unavailable: {exc}")
-            await self.event_bus.publish("audio_playback_completed", {"simulated": True})
+            await self.event_bus.publish(
+                "audio_playback_completed", {"simulated": True}
+            )
 
-    async def play_stream(self, audio_stream: AsyncIterator[bytes], sample_rate: int | None = None) -> None:
+    async def play_stream(
+        self, audio_stream: AsyncIterator[bytes], sample_rate: int | None = None
+    ) -> None:
         self._stop.clear()
         sr = sample_rate or self.sample_rate
         await self.event_bus.publish("audio_playback_started", {})
@@ -67,7 +79,9 @@ class AudioPlayer:
             if self._stop.is_set():
                 await self.event_bus.publish("audio_playback_interrupted", {})
             else:
-                await self.event_bus.publish("audio_playback_completed", {"simulated": True})
+                await self.event_bus.publish(
+                    "audio_playback_completed", {"simulated": True}
+                )
 
     async def stop(self) -> None:
         self._stop.set()

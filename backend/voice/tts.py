@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-import asyncio
 import re
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
-
 from core.error_handler import APIError
 from core.event_bus import EventBus
 from core.logger import get_logger
-from voice.tts_local import LocalTTS
-from voice.tts_elevenlabs import ElevenLabsTTS
+
 from voice.tts_edge import EdgeTTS
-from voice.tts_kokoro import KokoroTTS
+from voice.tts_elevenlabs import ElevenLabsTTS
 from voice.tts_kitten import KittenTTS
+from voice.tts_kokoro import KokoroTTS
+from voice.tts_local import LocalTTS
 from voice.tts_piper import PiperTTS
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
+    from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
@@ -23,7 +27,7 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?\n])\s+")
 
 
 class TTSManager:
-    def __init__(self, config, event_bus: EventBus) -> None:
+    def __init__(self, config: JarvisConfig, event_bus: EventBus) -> None:
         self.config = config
         self.event_bus = event_bus
         preferred_primary = (config.tts.primary or "").strip().lower()
@@ -43,7 +47,9 @@ class TTSManager:
         self.piper = PiperTTS(config)
 
         if self.primary_name == "kitten" and not self.kitten.available:
-            logger.warning("KittenTTS requested but unavailable, falling back to local TTS")
+            logger.warning(
+                "KittenTTS requested but unavailable, falling back to local TTS"
+            )
             self.primary_name = "local"
         if self.primary_name == "piper" and not self.piper.available:
             logger.warning("Piper requested but unavailable, falling back to local TTS")
@@ -57,28 +63,56 @@ class TTSManager:
         self.kitten.cancel()
         self.piper.cancel()
 
-    async def synthesize(self, text: str) -> np.ndarray:
+    async def synthesize(self, text: str) -> NDArray[np.float32]:
         self._cancelled = False
         await self.event_bus.publish("tts_started", {"text": text})
 
-        backend = self._backend(self.primary_name)
-        fallback = self._backend(self.fallback_name)
+        engines_to_try = [self.primary_name]
+        if self.fallback_name and self.fallback_name not in engines_to_try:
+            engines_to_try.append(self.fallback_name)
 
-        try:
-            audio = await self._synthesize_with_backend(backend, text)
-        except Exception as exc:
-            await self.event_bus.publish("tts_error", {"provider": self.primary_name, "error": str(exc)})
-            logger.warning(f"Primary TTS failed, falling back: {exc}")
-            audio = await self._synthesize_with_backend(fallback, text)
+        # Add all other supported engines as ultimate fallbacks
+        for ultimate in ["piper", "edge", "local"]:
+            if ultimate not in engines_to_try:
+                engines_to_try.append(ultimate)
 
-        await self.event_bus.publish("tts_completed", {"duration_ms": int(len(audio) / self.config.tts.sample_rate * 1000)})
+        audio = None
+        last_error = None
+
+        for engine_name in engines_to_try:
+            backend = self._backend(engine_name)
+            try:
+                audio = await self._synthesize_with_backend(backend, text)
+                if audio is not None:
+                    break
+            except Exception as exc:
+                last_error = exc
+                await self.event_bus.publish(
+                    "tts_error", {"provider": engine_name, "error": str(exc)}
+                )
+                logger.warning(f"TTS engine '{engine_name}' failed, trying next: {exc}")
+                continue
+
+        if audio is None:
+            if last_error:
+                raise last_error
+            raise APIError("All TTS engines failed to synthesize audio")
+
+        await self.event_bus.publish(
+            "tts_completed",
+            {"duration_ms": int(len(audio) / self.config.tts.sample_rate * 1000)},
+        )
         return audio
 
-    async def stream_synthesize(self, text_chunks: AsyncIterator[str]) -> AsyncIterator[bytes]:
+    async def stream_synthesize(
+        self, text_chunks: AsyncIterator[str]
+    ) -> AsyncIterator[bytes]:
         self._cancelled = False
         buffer = ""
-        started_at = datetime.now(timezone.utc).isoformat()
-        await self.event_bus.publish("tts_started", {"text": "", "started_at": started_at})
+        started_at = datetime.now(UTC).isoformat()
+        await self.event_bus.publish(
+            "tts_started", {"text": "", "started_at": started_at}
+        )
 
         async for chunk in text_chunks:
             if self._cancelled:
@@ -91,36 +125,65 @@ class TTSManager:
                 async for audio_chunk in self._stream_sentence(sentence):
                     if self._cancelled:
                         break
-                    await self.event_bus.publish("tts_chunk_ready", {"size": len(audio_chunk)})
+                    await self.event_bus.publish(
+                        "tts_chunk_ready", {"size": len(audio_chunk)}
+                    )
                     yield audio_chunk
 
         if not self._cancelled and buffer.strip():
             async for audio_chunk in self._stream_sentence(buffer.strip()):
-                await self.event_bus.publish("tts_chunk_ready", {"size": len(audio_chunk)})
+                await self.event_bus.publish(
+                    "tts_chunk_ready", {"size": len(audio_chunk)}
+                )
                 yield audio_chunk
 
         await self.event_bus.publish("tts_completed", {"duration_ms": 0})
 
     async def _stream_sentence(self, sentence: str) -> AsyncIterator[bytes]:
-        backend = self._backend(self.primary_name)
-        fallback = self._backend(self.fallback_name)
+        engines_to_try = [self.primary_name]
+        if self.fallback_name and self.fallback_name not in engines_to_try:
+            engines_to_try.append(self.fallback_name)
 
-        try:
-            async for chunk in self._stream_with_backend(backend, sentence):
-                if self._cancelled:
+        for ultimate in ["piper", "edge", "local"]:
+            if ultimate not in engines_to_try:
+                engines_to_try.append(ultimate)
+
+        success = False
+        last_error = None
+
+        for engine_name in engines_to_try:
+            backend = self._backend(engine_name)
+            try:
+                # Use a flag to check if we actually yielded anything
+                async for chunk in self._stream_with_backend(backend, sentence):
+                    if self._cancelled:
+                        break
+                    yield chunk
+
+                if not self._cancelled:
+                    success = True
                     break
-                yield chunk
-            return
-        except Exception as exc:
-            await self.event_bus.publish("tts_error", {"provider": self.primary_name, "error": str(exc)})
-            logger.warning(f"Primary streaming TTS failed, fallback provider engaged: {exc}")
+            except Exception as exc:
+                last_error = exc
+                await self.event_bus.publish(
+                    "tts_error", {"provider": engine_name, "error": str(exc)}
+                )
+                logger.warning(
+                    f"Streaming TTS engine '{engine_name}' failed, trying next: {exc}"
+                )
+                continue
 
-        async for chunk in self._stream_with_backend(fallback, sentence):
-            if self._cancelled:
-                break
-            yield chunk
+        if not success and not self._cancelled:
+            if last_error:
+                logger.error(
+                    f"All streaming TTS engines failed. Last error: {last_error}"
+                )
+            else:
+                logger.error("All streaming TTS engines failed to produce audio")
 
-    async def _synthesize_with_backend(self, backend: str, text: str) -> np.ndarray:
+    async def _synthesize_with_backend(
+        self, backend: str, text: str
+    ) -> NDArray[np.float32]:
         if backend == "elevenlabs":
             mp3_bytes = await self.eleven.synthesize(text)
             try:
@@ -150,7 +213,9 @@ class TTSManager:
 
         raise APIError(f"Unsupported TTS backend: {backend}")
 
-    async def _stream_with_backend(self, backend: str, text: str) -> AsyncIterator[bytes]:
+    async def _stream_with_backend(
+        self, backend: str, text: str
+    ) -> AsyncIterator[bytes]:
         if backend == "elevenlabs":
             # ElevenLabs stream endpoint yields encoded bytes (e.g., MP3),
             # while AudioPlayer stream expects int16 PCM chunks.
@@ -204,7 +269,11 @@ class TTSManager:
 
     def _backend(self, name: str) -> str:
         lowered = (name or "").strip().lower()
-        return lowered if lowered in {"elevenlabs", "local", "kokoro", "kitten", "edge", "piper"} else "local"
+        return (
+            lowered
+            if lowered in {"elevenlabs", "local", "kokoro", "kitten", "edge", "piper"}
+            else "local"
+        )
 
     def _pop_sentences(self, text: str) -> tuple[list[str], str]:
         parts = _SENTENCE_SPLIT_RE.split(text)
@@ -214,7 +283,9 @@ class TTSManager:
         remaining = parts[-1]
         return complete, remaining
 
-    def _resample(self, audio: np.ndarray, src_rate: int, dst_rate: int) -> np.ndarray:
+    def _resample(
+        self, audio: NDArray[np.float32], src_rate: int, dst_rate: int
+    ) -> NDArray[np.float32]:
         if src_rate == dst_rate or audio.size == 0:
             return audio
         duration = len(audio) / float(src_rate)
@@ -223,8 +294,9 @@ class TTSManager:
         dst_time = np.linspace(0, duration, num=max(1, dst_len), endpoint=False)
         return np.interp(dst_time, src_time, audio).astype(np.float32)
 
-    def _decode_audio_bytes(self, encoded_audio: bytes) -> np.ndarray:
+    def _decode_audio_bytes(self, encoded_audio: bytes) -> NDArray[np.float32]:
         import io
+
         # Try soundfile first (works for WAV/FLAC/OGG)
         try:
             import soundfile as sf
@@ -234,7 +306,7 @@ class TTSManager:
                 audio = audio.mean(axis=1)
             if sr != self.config.tts.sample_rate:
                 audio = self._resample(audio, sr, self.config.tts.sample_rate)
-            return audio.astype(np.float32)
+            return cast("NDArray[np.float32]", audio.astype(np.float32))
         except Exception:
             pass
         # Fallback: pydub for MP3 (ElevenLabs output)
@@ -242,11 +314,15 @@ class TTSManager:
             from pydub import AudioSegment
 
             segment = AudioSegment.from_file(io.BytesIO(encoded_audio))
-            segment = segment.set_frame_rate(self.config.tts.sample_rate).set_channels(1)
+            segment = segment.set_frame_rate(self.config.tts.sample_rate).set_channels(
+                1
+            )
             samples = np.array(segment.get_array_of_samples(), dtype=np.float32)
             # Normalize based on sample width
             max_val = float(2 ** (8 * segment.sample_width - 1))
             return (samples / max_val).astype(np.float32)
         except Exception as exc:
             logger.error(f"Audio decode failed with all backends: {exc}")
-            return np.zeros(self.config.tts.sample_rate, dtype=np.float32)  # 1 second silence
+            return np.zeros(
+                self.config.tts.sample_rate, dtype=np.float32
+            )  # 1 second silence

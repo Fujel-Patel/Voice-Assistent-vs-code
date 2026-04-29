@@ -4,17 +4,24 @@ import datetime as dt
 import subprocess
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-try:
-    from PIL import Image
-except Exception:  # pragma: no cover
-    Image = None
-
-try:
+if TYPE_CHECKING:
     import mss
-except Exception:  # pragma: no cover
-    mss = None
+    from PIL import Image
+else:
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = Any
+    try:
+        import mss
+    except ImportError:
+        mss = Any
+
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 from core.logger import get_logger
 
@@ -45,9 +52,11 @@ class ScreenCapture:
                 for idx, m in enumerate(monitors, start=1)
             ]
 
-    async def capture_full(self, save: bool | None = None):
+    async def capture_full(self, save: bool | None = None) -> PILImage:
         if mss is None or Image is None:
-            raise RuntimeError("Screenshot dependencies unavailable. Install mss and Pillow.")
+            raise RuntimeError(
+                "Screenshot dependencies unavailable. Install mss and Pillow."
+            )
 
         with mss.mss() as sct:
             monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
@@ -58,9 +67,11 @@ class ScreenCapture:
             self._save_image(image)
         return image
 
-    async def capture_monitor(self, index: int, save: bool | None = None):
+    async def capture_monitor(self, index: int, save: bool | None = None) -> PILImage:
         if mss is None or Image is None:
-            raise RuntimeError("Screenshot dependencies unavailable. Install mss and Pillow.")
+            raise RuntimeError(
+                "Screenshot dependencies unavailable. Install mss and Pillow."
+            )
 
         with mss.mss() as sct:
             all_monitors = sct.monitors
@@ -73,9 +84,13 @@ class ScreenCapture:
             self._save_image(image)
         return image
 
-    async def capture_region(self, x: int, y: int, w: int, h: int, save: bool | None = None):
+    async def capture_region(
+        self, x: int, y: int, w: int, h: int, save: bool | None = None
+    ) -> PILImage:
         if mss is None or Image is None:
-            raise RuntimeError("Screenshot dependencies unavailable. Install mss and Pillow.")
+            raise RuntimeError(
+                "Screenshot dependencies unavailable. Install mss and Pillow."
+            )
 
         monitor = {"left": x, "top": y, "width": w, "height": h}
         with mss.mss() as sct:
@@ -86,13 +101,13 @@ class ScreenCapture:
             self._save_image(image)
         return image
 
-    async def capture_active_window(self, save: bool | None = None):
+    async def capture_active_window(self, save: bool | None = None) -> PILImage:
         region = self._active_window_region()
         if region is None:
             return await self.capture_full(save=save)
         return await self.capture_region(*region, save=save)
 
-    def encode_for_api(self, image, quality: int = 85) -> bytes:
+    def encode_for_api(self, image: PILImage, quality: int = 85) -> bytes:
         if Image is None:
             raise RuntimeError("Pillow is required for image encoding")
         processed = self._post_process(image)
@@ -102,7 +117,11 @@ class ScreenCapture:
 
     def _active_window_region(self) -> tuple[int, int, int, int] | None:
         try:
-            cmd = ["bash", "-lc", "xwininfo -id $(xdotool getactivewindow) | awk '/Absolute upper-left X|Absolute upper-left Y|Width|Height/ {print $4}'"]
+            cmd = [
+                "bash",
+                "-lc",
+                "xwininfo -id $(xdotool getactivewindow) | awk '/Absolute upper-left X|Absolute upper-left Y|Width|Height/ {print $4}'",
+            ]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             values = [int(v.strip()) for v in result.stdout.splitlines() if v.strip()]
             if len(values) == 4:
@@ -111,17 +130,20 @@ class ScreenCapture:
             return None
         return None
 
-    def _post_process(self, image):
+    def _post_process(self, image: PILImage) -> PILImage:
         if Image is None:
             return image
         max_side = max(image.size)
         if max_side <= 1568:
             return image
         scale = 1568.0 / float(max_side)
-        resized = image.resize((int(image.width * scale), int(image.height * scale)), Image.Resampling.LANCZOS)
+        resized = image.resize(
+            (int(image.width * scale), int(image.height * scale)),
+            Image.Resampling.LANCZOS,
+        )
         return resized
 
-    def _save_image(self, image) -> Path:
+    def _save_image(self, image: PILImage) -> Path:
         ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         path = self.output_dir / f"screen_{ts}.jpg"
         image.save(path, format="JPEG", quality=85, optimize=True)
@@ -129,7 +151,11 @@ class ScreenCapture:
         return path
 
     def _cleanup_old(self) -> None:
-        files = sorted(self.output_dir.glob("screen_*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = sorted(
+            self.output_dir.glob("screen_*.jpg"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
         for extra in files[self.keep_last :]:
             try:
                 extra.unlink(missing_ok=True)

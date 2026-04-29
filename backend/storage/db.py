@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
-
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class Database:
-    def __init__(self, db_path: str | Path = Path(__file__).parent.parent / "data" / "jarvis.db"):
+    def __init__(
+        self, db_path: str | Path = Path(__file__).parent.parent / "data" / "jarvis.db"
+    ) -> None:
         self.db_path = Path(db_path)
         self._conn: aiosqlite.Connection | None = None
         self._lock = asyncio.Lock()
@@ -31,6 +33,8 @@ class Database:
             logger.info(f"Database initialized at {self.db_path}")
 
     async def _run_migrations(self) -> None:
+        if self._conn is None:
+            return
         migrations_dir = Path(__file__).parent / "migrations"
         if not migrations_dir.exists():
             return
@@ -41,14 +45,22 @@ class Database:
             await self._conn.executescript(sql)
         await self._conn.commit()
 
-    async def execute(self, query: str, params: tuple | list | None = None):
+    async def execute(
+        self, query: str, params: tuple[Any, ...] | list[Any] | None = None
+    ) -> aiosqlite.Cursor:
         if self._conn is None:
             await self.initialize()
+        if self._conn is None:
+            raise RuntimeError("Database connection not initialized")
         return await self._conn.execute(query, tuple(params or ()))
 
-    async def fetch_all(self, query: str, params: tuple | list | None = None) -> list[dict]:
+    async def fetch_all(
+        self, query: str, params: tuple[Any, ...] | list[Any] | None = None
+    ) -> list[dict[str, Any]]:
         if self._conn is None:
             await self.initialize()
+        if self._conn is None:
+            raise RuntimeError("Database connection not initialized")
         async with self._conn.execute(query, tuple(params or ())) as cur:
             rows = await cur.fetchall()
             return [dict(row) for row in rows]
@@ -56,6 +68,8 @@ class Database:
     async def commit(self) -> None:
         if self._conn is None:
             await self.initialize()
+        if self._conn is None:
+            raise RuntimeError("Database connection not initialized")
         await self._conn.commit()
 
     async def close(self) -> None:

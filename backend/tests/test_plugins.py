@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from plugins.app_launcher import AppLauncherPlugin
 from plugins.plugin_manager import PluginManager
 from plugins.system_control import SystemControlPlugin
@@ -21,11 +22,13 @@ def test_plugin_registration() -> None:
 
 
 @pytest.mark.asyncio
-async def test_app_launcher_open(mocker) -> None:
+async def test_app_launcher_open(mocker: Any) -> None:
     plugin = AppLauncherPlugin()
 
     launch_mock = mocker.patch.object(plugin, "_launch_command")
-    finder = mocker.patch.object(plugin, "_find_processes", side_effect=[[], [mocker.Mock(pid=1234)]])
+    finder = mocker.patch.object(
+        plugin, "_find_processes", side_effect=[[], [mocker.Mock(pid=1234)]]
+    )
 
     result = await plugin.execute(
         {
@@ -42,7 +45,7 @@ async def test_app_launcher_open(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_app_launcher_close(mocker) -> None:
+async def test_app_launcher_close(mocker: Any) -> None:
     plugin = AppLauncherPlugin()
 
     proc = mocker.Mock()
@@ -69,7 +72,7 @@ def test_app_alias_resolution() -> None:
 
 
 @pytest.mark.asyncio
-async def test_volume_control(mocker) -> None:
+async def test_volume_control(mocker: Any) -> None:
     plugin = SystemControlPlugin()
     volume_cmd = mocker.patch.object(plugin, "_volume_command")
 
@@ -86,7 +89,7 @@ async def test_volume_control(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_brightness_control(mocker) -> None:
+async def test_brightness_control(mocker: Any) -> None:
     plugin = SystemControlPlugin()
     brightness_cmd = mocker.patch.object(plugin, "_brightness_command")
 

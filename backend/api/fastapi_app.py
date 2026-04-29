@@ -1,52 +1,27 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from core.logger import get_logger
+from core.orchestrator import get_orchestrator
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.logger import get_logger
-from main import get_backend
+from api.routers.system import router as system_router
+from api.routers.websocket import router as websocket_router
 
 logger = get_logger(__name__)
 
 
-class FastAPIWebSocketAdapter:
-    """Adapter to reuse existing websocket business logic with FastAPI transport."""
-
-    def __init__(self, websocket: WebSocket) -> None:
-        self._ws = websocket
-
-    async def send(self, payload: str) -> None:
-        await self._ws.send_text(payload)
-
-    async def close(self, code: int = 1001, reason: str = "") -> None:
-        await self._ws.close(code=code, reason=reason)
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self) -> str:
-        try:
-            return await self._ws.receive_text()
-        except WebSocketDisconnect:
-            raise StopAsyncIteration
-        except RuntimeError as exc:
-            # "WebSocket is not connected" or similar
-            raise StopAsyncIteration from exc
-        except Exception as exc:
-            logger.warning(f"WebSocket receive error: {exc}")
-            raise StopAsyncIteration from exc
-
-
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
-    backend = get_backend()
-    await backend.start()
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    orchestrator = get_orchestrator()
+    await orchestrator.start()
     try:
         yield
     finally:
-        await backend.stop()
+        await orchestrator.stop()
 
 
 app = FastAPI(title="Jarvis Backend", version="1.0.0", lifespan=lifespan)
@@ -62,35 +37,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/health")
-async def health() -> dict:
-    backend = get_backend()
-    return {
-        "ok": True,
-        "status": "healthy",
-        "always_on": backend.always_on_enabled,
-        "backend": backend.latest_health_status,
-    }
-
-
-async def _serve_websocket(websocket: WebSocket) -> None:
-    await websocket.accept()
-    backend = get_backend()
-    adapter = FastAPIWebSocketAdapter(websocket)
-    await backend._handle_client(adapter)
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket) -> None:
-    await _serve_websocket(websocket)
-
-
-@app.websocket("/")
-async def websocket_root_endpoint(websocket: WebSocket) -> None:
-    await _serve_websocket(websocket)
-
-
-@app.get("/")
-async def root() -> dict:
-    return {"service": "jarvis-backend", "transport": "fastapi-websocket", "ws_path": "/ws"}
+app.include_router(system_router)
+app.include_router(websocket_router)

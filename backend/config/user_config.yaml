@@ -9,7 +9,7 @@ audio:
 brain:
   stream_chunks: true
   models:
-    gemini: gemini-2.5-flash
+    gemini: gemini-1.5-flash
 wake_word:
   sensitivity: 0.7
 window:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Any
 
 from core.event_bus import EventBus
 from core.logger import get_logger
@@ -21,9 +22,9 @@ class HealthChecker:
     interval_seconds: float = 30.0
 
     def __post_init__(self) -> None:
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[None] | None = None
 
-    async def run_once(self) -> dict:
+    async def run_once(self) -> dict[str, Any]:
         mic_ok, mic_msg = await self.microphone_probe()
         model_ok, model_msg = await self.model_probe()
         ws_ok, ws_msg = await self.websocket_probe()

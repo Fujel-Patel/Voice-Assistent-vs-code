@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-
 from config.config_loader import JarvisConfig
 from core.logger import get_logger
+
 from voice.model_manager import ModelManager
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
@@ -21,8 +25,10 @@ class SpeechToText:
 
     async def transcribe(
         self,
-        audio_data: np.ndarray | bytes,
+        audio_data: NDArray[Any] | bytes,
         on_chunk: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        finalize: bool = True,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
 
@@ -35,7 +41,9 @@ class SpeechToText:
             return {
                 "text": "",
                 "confidence": 0.05,
-                "language": self._config.stt.language if self._config.stt.language != "auto" else "unknown",
+                "language": self._config.stt.language
+                if self._config.stt.language != "auto"
+                else "unknown",
                 "duration_seconds": 0.0,
             }
 
@@ -44,14 +52,18 @@ class SpeechToText:
             return {
                 "text": "",
                 "confidence": 0.05,
-                "language": self._config.stt.language if self._config.stt.language != "auto" else "unknown",
+                "language": self._config.stt.language
+                if self._config.stt.language != "auto"
+                else "unknown",
                 "duration_seconds": audio.size / float(self._config.audio.sample_rate),
             }
 
         model = await self.model_manager.ensure_loaded()
 
         normalized = audio.astype(np.float32) / 32768.0
-        lang = None if self._config.stt.language == "auto" else self._config.stt.language
+        lang = (
+            None if self._config.stt.language == "auto" else self._config.stt.language
+        )
 
         segments, info = model.transcribe(
             normalized,

@@ -45,11 +45,6 @@ export default function MainPage() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null)
   const [audioLevels, setAudioLevels] = useState<number[]>([])
 
-  const supportsLocalSpeech = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-  }, [])
-
   const isBusy = ['wake_detected', 'listening', 'transcribing', 'thinking', 'speaking'].includes(voiceState)
 
   const connectionMeta = useMemo(() => {
@@ -60,9 +55,6 @@ export default function MainPage() {
 
   const liveUserTextRef = useRef('')
   const liveAssistantTextRef = useRef('')
-  const prevVoiceStateRef = useRef('idle')
-  const localSpeechRef = useRef<any>(null)
-  const localSpeechActiveRef = useRef(false)
   const inputRef = useRef(null)
   const manualSessionActiveRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -90,7 +82,7 @@ export default function MainPage() {
 
   useEffect(() => {
     if (!liveAssistantText.trim() || displayedAssistantText.length >= liveAssistantText.length) return
-    
+
     const timer = setInterval(() => {
       setDisplayedAssistantText(prev => {
         const nextLen = Math.min(prev.length + Math.floor(Math.random() * 2) + 1, liveAssistantText.length)
@@ -100,48 +92,6 @@ export default function MainPage() {
     return () => clearInterval(timer)
   }, [liveAssistantText, displayedAssistantText.length])
 
-  const stopLocalSpeechPreview = useCallback(() => {
-    localSpeechActiveRef.current = false
-    const recognition = localSpeechRef.current as any
-    if (!recognition) return
-    try { recognition.stop() } catch { /* ignore */ }
-  }, [])
-
-  const startLocalSpeechPreview = useCallback(() => {
-    if (!supportsLocalSpeech || localSpeechActiveRef.current) return
-    let recognition = localSpeechRef.current as any
-    if (!recognition) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SpeechRecognition) return
-      recognition = new SpeechRecognition()
-      recognition.lang = 'en-US'
-      recognition.continuous = true
-      recognition.interimResults = true
-      localSpeechRef.current = recognition
-    }
-
-    recognition.onresult = (event: any) => {
-      let interim = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i]
-        const text = result?.[0]?.transcript || ''
-        if (result?.isFinal) {
-          if (text.trim()) setLiveUserText(text.trim())
-        } else {
-          interim += text
-        }
-      }
-      if (interim.trim()) setLiveUserText(interim.trim())
-    }
-    recognition.onerror = () => { localSpeechActiveRef.current = false }
-    recognition.onend = () => {
-      if (!localSpeechActiveRef.current) return
-      try { (recognition as any).start() } catch { localSpeechActiveRef.current = false }
-    }
-    localSpeechActiveRef.current = true
-    try { (recognition as any).start() } catch { localSpeechActiveRef.current = false }
-  }, [supportsLocalSpeech])
-
   const finalizeAssistantStreaming = useCallback(() => {
     const text = sanitizeAssistantText(liveAssistantTextRef.current)
     if (text) {
@@ -150,21 +100,6 @@ export default function MainPage() {
       setDisplayedAssistantText('')
     }
   }, [addMessage])
-
-  useEffect(() => {
-    const prev = prevVoiceStateRef.current
-    prevVoiceStateRef.current = voiceState
-    if (alwaysOnSpeaker && prev === 'speaking' && voiceState === 'idle' && connectionState === 'connected') {
-      const timer = setTimeout(() => {
-        if (websocket.sendMessage({ type: 'start_listening', payload: { source: 'always_on' } })) {
-          manualSessionActiveRef.current = true
-          startLocalSpeechPreview()
-        }
-      }, 750)
-      return () => clearTimeout(timer)
-    }
-  }, [voiceState, alwaysOnSpeaker, connectionState, websocket, startLocalSpeechPreview])
-
   const handleTextSubmit = (e: FormEvent) => {
     if (e) e.preventDefault()
     if (!typedText.trim()) return
@@ -185,21 +120,23 @@ export default function MainPage() {
 
   const handleMicClick = () => {
     if (isBusy) {
-      websocket.sendMessage({ type: 'interrupt', payload: {} })
-      manualSessionActiveRef.current = false
-      stopLocalSpeechPreview()
+      // Toggle OFF: send interrupt to stop current voice session
+      const sent = websocket.sendMessage({ type: 'interrupt', payload: { source: 'tap_to_speak' } })
+      if (sent) {
+        manualSessionActiveRef.current = false
+        setIsTapBusy(false)
+      }
       return
     }
+
+    // Toggle ON: start listening
     manualSessionActiveRef.current = true
     setIsTapBusy(true)
     const sent = websocket.sendMessage({ type: 'start_listening', payload: { source: 'tap_to_speak' } })
     if (!sent) {
       manualSessionActiveRef.current = false
       setIsTapBusy(false)
-      stopLocalSpeechPreview()
       addToast({ type: 'warning', title: 'Not connected', message: 'Backend WebSocket is not connected yet.' })
-    } else {
-      startLocalSpeechPreview()
     }
   }
 
@@ -214,10 +151,8 @@ export default function MainPage() {
         if (next === 'idle' || next === 'error') {
           manualSessionActiveRef.current = false
           setIsTapBusy(false)
-          stopLocalSpeechPreview()
         }
         if (next === 'thinking' || next === 'speaking') {
-          stopLocalSpeechPreview()
           setIsTapBusy(false)
         }
       }),
@@ -247,8 +182,16 @@ export default function MainPage() {
       websocket.subscribe('tts_end', (payload: any) => {
         if (payload?.duration_ms) setLatencyMs(Math.round(Number(payload.duration_ms)))
         finalizeAssistantStreaming()
-        setVoiceState('idle')
-        setVoiceStateStore('idle')
+        
+        // Only reset to idle if we are currently speaking.
+        // If we are already listening (due to interrupt), don't reset.
+        setVoiceState(prev => {
+          if (prev === 'speaking') {
+            setVoiceStateStore('idle')
+            return 'idle'
+          }
+          return prev
+        })
       }),
       websocket.subscribe('audio_level', (payload: any) => {
         setAudioLevels(Array.isArray(payload?.levels) ? payload.levels : [])
@@ -260,7 +203,7 @@ export default function MainPage() {
       }),
     ]
     return () => unsubscribers.forEach(un => un?.())
-  }, [addMessage, addToast, setVoiceStateStore, websocket, stopLocalSpeechPreview, finalizeAssistantStreaming])
+  }, [addMessage, addToast, setVoiceStateStore, websocket, finalizeAssistantStreaming])
 
   const hasMessages = messages.length > 0 || !!liveUserText || !!liveAssistantText
 
@@ -268,248 +211,242 @@ export default function MainPage() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen flex flex-col"
+      className="h-screen flex flex-col relative overflow-hidden"
     >
-      {/* Header */}
-      <motion.header 
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="flex items-center justify-between px-3 sm:px-4 py-2"
-      >
-        <div>
-          <motion.h1 
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            className="text-3xl font-bold tracking-tight"
-          >
-            <span className="text-gradient">Jarvis</span>
-          </motion.h1>
-          <p className="text-sm text-muted-foreground">Advanced Voice Assistant</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={toggleTheme}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              "bg-white/5 hover:bg-white/10 border border-white/10",
-              "backdrop-blur-xl"
-            )}
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/settings')}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              "bg-white/5 hover:bg-white/10 border border-white/10",
-              "backdrop-blur-xl"
-            )}
-          >
-            <Settings size={18} />
-          </motion.button>
-        </div>
-      </motion.header>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-           <motion.div
-             initial={{ scale: 0.8, opacity: 0 }}
-             animate={{ scale: 1, opacity: 1 }}
-             transition={{ delay: 0.1 }}
-             className="w-full max-w-2xl h-[300px] sm:h-[400px] relative"
-           >
+      {/* Background Reactor Layer */}
+      <div className="fixed inset-0 pointer-events-none flex items-center justify-center opacity-30 z-0 overflow-hidden">
+        <div className="w-[120%] h-[120%] sm:w-full sm:h-full max-w-5xl">
           <Canvas camera={{ position: [0, 0, 6] }}>
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1} />
             <JarvisReactor state={voiceState.toUpperCase()} audioLevel={Math.max(...audioLevels, 0)} />
           </Canvas>
-        </motion.div>
+        </div>
+      </div>
 
-        {/* Status Pills */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center gap-3 mt-4"
+      {/* Content Layer (Foreground) */}
+      <div className="relative z-10 h-full flex flex-col">
+        {/* Header */}
+        <motion.header 
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex items-center justify-between px-6 py-6"
         >
-          <span className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono bg-white/5 border border-white/10 backdrop-blur-xl", connectionMeta.className)}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-            {connectionMeta.text}
-          </span>
-          {latencyMs !== null && (
-            <span className="px-3 py-1.5 rounded-full text-xs font-mono bg-white/5 border border-white/10 backdrop-blur-xl">
-              <Sparkles size={12} className="inline mr-1" />
-              {latencyMs}ms
-            </span>
-          )}
-        </motion.div>
-      </main>
+          <div>
+            <motion.h1 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="text-4xl font-black tracking-tighter"
+            >
+              <span className="text-gradient">JARVIS</span>
+            </motion.h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="h-[1px] w-8 bg-primary/40" />
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/80 font-mono">System OS // HUD_V1</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 px-4 py-2 rounded-2xl bg-black/20 border border-white/5 backdrop-blur-md">
+              <span className={cn("flex items-center gap-2 text-[10px] font-mono tracking-widest", connectionMeta.className)}>
+                <span className="w-1 h-1 rounded-full bg-current animate-pulse shadow-[0_0_8px_currentColor]" />
+                {connectionMeta.text}
+              </span>
+              {latencyMs !== null && (
+                <>
+                  <span className="h-3 w-[1px] bg-white/10" />
+                  <span className="text-[10px] font-mono tracking-widest text-cyan-400/80">
+                    LATENCY: {latencyMs}MS
+                  </span>
+                </>
+              )}
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleTheme}
+              className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
+            >
+              {theme === 'dark' ? <Sun size={20} className="text-foreground/80" /> : <Moon size={20} className="text-foreground/80" />}
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/settings')}
+              className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
+            >
+              <Settings size={20} className="text-foreground/80" />
+            </motion.button>
+          </div>
+        </motion.header>
 
-      {/* Chat Area */}
-      <section className="flex-1 w-full max-w-2xl mx-auto px-4 flex flex-col min-h-0">
-         <AnimatePresence mode="wait">
-            {!hasMessages ? (
-              <motion.div
-                key="suggestions"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex flex-wrap justify-center gap-4 py-8"
-              >
-                {QUICK_SUGGESTIONS.map((chip, i) => (
-                  <motion.button
-                    key={chip}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1 * i }}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => sendTextCommand(chip)}
-                    className={cn(
-                      "px-6 py-3 rounded-xl text-sm font-medium",
-                      "bg-white/5 hover:bg-white/10 border border-white/20",
-                      "backdrop-blur-xl transition-all duration-300",
-                      "hover:glow-cyan hover:border-cyan-500/50"
-                    )}
-                  >
-                    {chip}
-                  </motion.button>
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="messages"
-                ref={scrollRef}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto no-scrollbar scroll-smooth"
-              >
-                {messages.slice(-10).map((msg: any, i: number) => (
+        {/* Chat / Conversation Area */}
+        <main className="flex-1 flex flex-col items-center relative overflow-hidden">
+          <section className="w-full max-w-4xl h-full flex flex-col justify-end pb-4 overflow-hidden relative">
+            <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth px-6 py-8" ref={scrollRef}>
+              <AnimatePresence mode="popLayout">
+                {!hasMessages ? (
                   <motion.div
-                    key={msg.id}
-                    layout
-                    initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03, duration: 0.5 }}
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-5 py-3 border backdrop-blur-xl transition-all duration-300",
-                      msg.role === 'user' 
-                        ? "self-end bg-cyan-500/10 border-cyan-500/10 shadow-sm"
-                        : "self-start bg-white/5 border-white/5 shadow-sm"
-                    )}
+                    key="suggestions"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="h-full flex flex-col items-center justify-center gap-8"
                   >
-                    <div className="flex flex-col">
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
-                      {msg.meta && Object.keys(msg.meta).length > 0 && (
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          {Object.entries(msg.meta).map(([key, value]) => (
-                            <span key={key} className="flex items-center gap-1">
-                              <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                              <span className="whitespace-nowrap">{(value as React.ReactNode)}</span>
-                            </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+                      {QUICK_SUGGESTIONS.map((chip, i) => (
+                        <motion.button
+                          key={chip}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 * i }}
+                          whileHover={{ scale: 1.02, x: 5 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => sendTextCommand(chip)}
+                          className={cn(
+                            "group flex items-center justify-between p-5 rounded-2xl text-left",
+                            "bg-white/5 hover:bg-cyan-500/10 border border-white/20 hover:border-cyan-500/60",
+                            "backdrop-blur-md transition-all duration-500 shadow-lg"
+                          )}
+                        >
+                          <span className="text-sm font-medium text-foreground/80 group-hover:text-cyan-400">{chip}</span>
+                          <Sparkles size={14} className="text-white/20 group-hover:text-cyan-400 transition-colors" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="flex flex-col gap-8 min-h-full justify-end">
+                    {messages.map((msg: any) => (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-6 py-4 border shadow-2xl transition-colors duration-300",
+                          msg.role === 'user' 
+                            ? "self-end bg-cyan-600/10 border-cyan-500/40 text-right backdrop-blur-md"
+                            : "self-start bg-white/5 border-white/20 text-left backdrop-blur-xl"
+                        )}
+                      >
+                         {msg.role !== 'user' && (
+                           <div className="flex items-center gap-2 mb-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                             <span className="text-[10px] font-black tracking-[0.2em] text-cyan-400/80 uppercase">Jarvis Analysis</span>
+                           </div>
+                         )}
+                        <p className={cn(
+                          "leading-relaxed",
+                          msg.role === 'user' ? "text-base text-foreground/90" : "text-lg text-foreground font-medium"
+                        )}>
+                          {msg.content}
+                        </p>
+                      </motion.div>
+                    ))}
+                    
+                    {liveUserText && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="self-end max-w-[85%] rounded-2xl px-6 py-4 border border-cyan-500/50 bg-cyan-500/10 backdrop-blur-md shadow-xl"
+                      >
+                        <p className="text-base text-cyan-100/90">{liveUserText}<span className="cursor-blink ml-1 text-cyan-400 font-bold">_</span></p>
+                      </motion.div>
+                    )}
+
+                    {voiceState === 'thinking' && !liveAssistantText && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="self-start flex items-center gap-4 px-6 py-4 border border-white/20 backdrop-blur-xl rounded-2xl bg-white/5 shadow-2xl"
+                      >
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map(i => (
+                            <motion.div 
+                              key={i}
+                              animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                              transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+                              className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                            />
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-                {liveUserText && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="self-end max-w-[85%] rounded-2xl px-5 py-3 border border-white/5 backdrop-blur-xl"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-background-muted), transparent 60%)' }}
-                  >
-                    <div className="flex flex-col">
-                      <p className="text-sm">{liveUserText}</p>
-                    </div>
-                    <span className="cursor-blink ml-1">▍</span>
-                  </motion.div>
-                )}
-                {voiceState === 'thinking' && !liveAssistantText && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="self-center flex items-center gap-3 px-4 py-2 border border-white/5 backdrop-blur-xl rounded-full"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-background-muted), transparent 60%)' }}
-                  >
-                    <Loader2 size={14} className="animate-spin" />
-                    <span className="text-sm">Thinking...</span>
-                  </motion.div>
-                )}
-                {liveAssistantText && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="self-center max-w-[85%] rounded-2xl px-5 py-3 border border-white/5 backdrop-blur-xl"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-background-muted), transparent 60%)' }}
-                  >
-                    <div className="flex flex-col">
-                      <p className="text-lg leading-relaxed">{displayedAssistantText || liveAssistantText}</p>
-                    </div>
-                    <span className="cursor-blink ml-1">▍</span>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-         </AnimatePresence>
-       </section>
+                        <span className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">Synthesizing Neural Response</span>
+                      </motion.div>
+                    )}
 
-       {/* Input Area */}
-       <footer className="w-full max-w-xl mx-auto px-4 pb-8">
+                    {liveAssistantText && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="self-start w-full"
+                      >
+                        <div className="max-w-[95%] rounded-3xl px-8 py-8 border border-white/20 bg-black/60 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+                          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-500 to-transparent opacity-70" />
+                          <div className="flex items-center gap-3 mb-4">
+                             <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_12px_#22d3ee]" />
+                             <span className="text-[11px] font-black tracking-[0.4em] text-cyan-400 uppercase">Incoming Transmission</span>
+                          </div>
+                          <p className="text-2xl sm:text-3xl leading-[1.4] font-semibold text-foreground tracking-tight text-balance">
+                            {displayedAssistantText || liveAssistantText}
+                            <span className="cursor-blink ml-2 text-cyan-400 shadow-[0_0_10px_#22d3ee]">▍</span>
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+        </main>
+
+        {/* Input Area */}
+        <footer className="w-full max-w-3xl mx-auto px-4 pb-8 pt-4">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center gap-4 p-4 rounded-2xl border border-white/5 shadow-2xl backdrop-blur-3xl"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--color-background-muted), transparent 60%)' }}
+            className="flex items-center gap-4 p-4 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-3xl bg-black/20"
           >
-             <motion.button
-               whileHover={{ scale: 1.1 }}
-               whileTap={{ scale: 0.9 }}
-               onClick={handleMicClick}
-               disabled={isTapBusy && !isBusy}
-                className={cn(
-                  "w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300",
-                  isBusy 
-                    ? "bg-red-500 text-white shadow-lg hover:bg-red-600"
-                    : "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400"
-                )}
-             >
-               {isBusy ? <MicOff size={22} className="text-white" /> : <Mic size={22} className="text-cyan-400" />}
-             </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleMicClick}
+              disabled={connectionState !== 'connected'}
+              className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg",
+                isBusy 
+                  ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                  : "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400",
+                connectionState !== 'connected' && "opacity-40 cursor-not-allowed"
+              )}
+            >
+              {isBusy ? <MicOff size={24} /> : <Mic size={24} />}
+            </motion.button>
 
             <form
               onSubmit={handleTextSubmit}
-              className="flex-1 flex items-center gap-3"
+              className="flex-1 flex items-center gap-3 px-2"
             >
               <input
                 ref={inputRef}
                 value={typedText}
                 onChange={(e) => setTypedText(e.target.value)}
-                placeholder="How can I help you today?"
-                className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
-                style={{ fontSize: '1rem' }}
+                placeholder="Ask me anything..."
+                className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 text-lg py-2"
               />
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 type="submit"
                 disabled={!typedText.trim()}
                 className={cn(
-                  "p-3 rounded-xl",
-                  "bg-gradient-to-r from-cyan-500 to-violet-500 text-white",
-                  "hover:from-cyan-400 hover:to-violet-400",
-                  "transition-all duration-300",
-                  "shadow-lg",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                  "p-3.5 rounded-2xl transition-all duration-300 shadow-xl",
+                  "bg-gradient-to-br from-cyan-500 to-blue-600 text-white",
+                  "hover:from-cyan-400 hover:to-blue-500",
+                  "disabled:opacity-20 disabled:grayscale"
                 )}
               >
-                <Send size={20} className="text-white" />
+                <Send size={20} />
               </motion.button>
             </form>
 
@@ -518,19 +455,20 @@ export default function MainPage() {
               whileTap={{ scale: 0.95 }}
               onClick={() => setAlwaysOnSpeaker(!alwaysOnSpeaker)}
               className={cn(
-                "flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300",
+                "hidden sm:flex items-center gap-3 px-5 py-3 rounded-2xl text-sm font-bold transition-all duration-300",
                 alwaysOnSpeaker 
-                  ? "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400"
-                  : "bg-white/5 hover:bg-white/10 border border-white/10"
+                  ? "bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                  : "bg-white/5 border border-white/10 text-muted-foreground/60"
               )}
             >
-              <motion.div className="flex items-center gap-1">
-                <span className={cn("w-2.5 h-2.5 rounded-full", alwaysOnSpeaker ? "bg-cyan-400 animate-pulse" : "bg-white/30")} />
-                <span className="whitespace-nowrap">{alwaysOnSpeaker ? 'LIVE' : 'AUTO'}</span>
-              </motion.div>
+              <div className="flex items-center gap-2">
+                <span className={cn("w-2 h-2 rounded-full", alwaysOnSpeaker ? "bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]" : "bg-white/20")} />
+                <span className="tracking-widest">{alwaysOnSpeaker ? 'LIVE' : 'AUTO'}</span>
+              </div>
             </motion.button>
           </motion.div>
         </footer>
-     </motion.div>
+      </div>
+    </motion.div>
   )
 }

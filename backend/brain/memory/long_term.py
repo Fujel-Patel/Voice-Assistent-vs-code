@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
-
 from storage.db import get_db
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+    from sentence_transformers import SentenceTransformer
 
 
 class LongTermMemory:
     def __init__(self, embedding_model: str = "all-MiniLM-L6-v2") -> None:
         self.embedding_model_name = embedding_model
-        self._embedder = None
+        self._embedder: SentenceTransformer | Literal[False] | None = None
 
-    def _ensure_embedder(self):
+    def _ensure_embedder(self) -> SentenceTransformer | Literal[False]:
         if self._embedder is not None:
             return self._embedder
         try:
@@ -26,7 +29,7 @@ class LongTermMemory:
             self._embedder = False
         return self._embedder
 
-    def _embed(self, text: str) -> np.ndarray:
+    def _embed(self, text: str) -> NDArray[np.float32]:
         embedder = self._ensure_embedder()
         if embedder is False:
             # Fallback embedding: deterministic hash projection.
@@ -36,6 +39,7 @@ class LongTermMemory:
             norm = np.linalg.norm(arr)
             return arr if norm == 0 else arr / norm
 
+        # Mypy knows embedder is SentenceTransformer here
         vec = embedder.encode(text)
         out = np.array(vec, dtype=np.float32)
         norm = np.linalg.norm(out)
@@ -60,7 +64,7 @@ class LongTermMemory:
                 summary,
                 json.dumps(topics),
                 sqlite3.Binary(embedding),
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 turn_count,
             ),
         )
@@ -112,7 +116,9 @@ class LongTermMemory:
         rows = await db.fetch_all("SELECT key, value FROM user_preferences")
         return {row["key"]: row["value"] for row in rows}
 
-    async def learn_preference(self, key: str, value: str, source: str = "inferred") -> None:
+    async def learn_preference(
+        self, key: str, value: str, source: str = "inferred"
+    ) -> None:
         db = await get_db()
         await db.execute(
             """
@@ -123,6 +129,6 @@ class LongTermMemory:
               learned_at=excluded.learned_at,
               source=excluded.source
             """,
-            (key, value, datetime.now(timezone.utc).isoformat(), source),
+            (key, value, datetime.now(UTC).isoformat(), source),
         )
         await db.commit()

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import time
+from typing import Any
 
 import pytest
-
 from plugins.web_search import WebSearchPlugin
 from services.brave_search import BraveSearch
 from services.duckduckgo import DuckDuckGoSearch
@@ -12,14 +11,14 @@ from services.web_fetcher import WebFetcher
 
 
 @pytest.mark.asyncio
-async def test_brave_search(mocker) -> None:
+async def test_brave_search(mocker: Any) -> None:
     brave = BraveSearch()
     brave.api_key = "test-key"
 
     class Resp:
         status_code = 200
 
-        def json(self):
+        def json(self) -> dict[str, Any]:
             return {
                 "web": {
                     "results": [
@@ -33,29 +32,47 @@ async def test_brave_search(mocker) -> None:
             }
 
     client = mocker.patch("services.brave_search.httpx.AsyncClient")
-    client.return_value.__aenter__.return_value.get = mocker.AsyncMock(return_value=Resp())
+    client.return_value.__aenter__.return_value.get = mocker.AsyncMock(
+        return_value=Resp()
+    )
 
     results = await brave.search("python releases", count=1)
-    assert results and results[0]["url"] == "https://python.org"
+    assert results
+    assert results[0]["url"] == "https://python.org"
 
 
 @pytest.mark.asyncio
-async def test_duckduckgo_search(mocker) -> None:
+async def test_duckduckgo_search(mocker: Any) -> None:
     ddg = DuckDuckGoSearch()
-    mocker.patch.object(ddg, "_search_sync", return_value=[{"title": "A", "url": "https://a.com", "description": "d", "age": ""}])
+    mocker.patch.object(
+        ddg,
+        "_search_sync",
+        return_value=[
+            {"title": "A", "url": "https://a.com", "description": "d", "age": ""}
+        ],
+    )
 
     results = await ddg.search("query", count=1)
     assert results[0]["url"] == "https://a.com"
 
 
 @pytest.mark.asyncio
-async def test_fallback_to_duckduckgo(mocker) -> None:
+async def test_fallback_to_duckduckgo(mocker: Any) -> None:
     plugin = WebSearchPlugin()
     mocker.patch.object(plugin.brave, "search", side_effect=RuntimeError("rate limit"))
-    mocker.patch.object(plugin.ddg, "search", return_value=[{"title": "B", "url": "https://b.com", "description": "x", "age": ""}])
+    mocker.patch.object(
+        plugin.ddg,
+        "search",
+        return_value=[
+            {"title": "B", "url": "https://b.com", "description": "x", "age": ""}
+        ],
+    )
 
     result = await plugin.execute(
-        {"type": "web-search", "params": {"action": "search", "query": "latest python"}},
+        {
+            "type": "web-search",
+            "params": {"action": "search", "query": "latest python"},
+        },
         context={},
     )
     assert result.success is True
@@ -63,7 +80,7 @@ async def test_fallback_to_duckduckgo(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_web_fetcher(mocker) -> None:
+async def test_web_fetcher(mocker: Any) -> None:
     fetcher = WebFetcher()
     mocker.patch.object(fetcher, "_validate_url", return_value=None)
 
@@ -73,7 +90,9 @@ async def test_web_fetcher(mocker) -> None:
         url = "https://example.com"
 
     client = mocker.patch("services.web_fetcher.httpx.AsyncClient")
-    client.return_value.__aenter__.return_value.get = mocker.AsyncMock(return_value=Resp())
+    client.return_value.__aenter__.return_value.get = mocker.AsyncMock(
+        return_value=Resp()
+    )
 
     page = await fetcher.fetch_page("https://example.com")
     assert page["title"] == "Hello"
@@ -81,12 +100,22 @@ async def test_web_fetcher(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_url_summarizer(mocker) -> None:
+async def test_url_summarizer(mocker: Any) -> None:
     fetcher = WebFetcher()
-    mocker.patch.object(fetcher, "fetch_page", return_value={"url": "https://example.com", "title": "Title", "content": "one two three four five"})
+    mocker.patch.object(
+        fetcher,
+        "fetch_page",
+        return_value={
+            "url": "https://example.com",
+            "title": "Title",
+            "content": "one two three four five",
+        },
+    )
 
     class FakeClaude:
-        async def process_input(self, prompt: str, context: dict):
+        async def process_input(
+            self, prompt: str, context: dict[str, Any]
+        ) -> dict[str, Any]:
             return {"response_text": "short summary"}
 
     summarizer = URLSummarizer(claude_agent=FakeClaude(), fetcher=fetcher)
@@ -95,15 +124,21 @@ async def test_url_summarizer(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_caching(mocker) -> None:
+async def test_search_caching(mocker: Any) -> None:
     brave = BraveSearch()
     brave.api_key = "k"
 
     class Resp:
         status_code = 200
 
-        def json(self):
-            return {"web": {"results": [{"title": "X", "url": "https://x.com", "description": "desc"}]}}
+        def json(self) -> dict[str, Any]:
+            return {
+                "web": {
+                    "results": [
+                        {"title": "X", "url": "https://x.com", "description": "desc"}
+                    ]
+                }
+            }
 
     get_mock = mocker.AsyncMock(return_value=Resp())
     client = mocker.patch("services.brave_search.httpx.AsyncClient")

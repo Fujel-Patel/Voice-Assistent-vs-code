@@ -1,0 +1,21 @@
+# JARVIS — Agent Rules
+
+## Stack
+- FastAPI + WebSocket + Python 3.11+
+- Loguru for logging (never use print())
+- Pydantic v2 models for all data shapes
+
+## Code Rules
+- Type hints on EVERY function — no exceptions
+- FastAPI routes MUST have `response_model`
+- WebSocket handlers MUST have try/except with close codes
+- Never bare `except:` — always specific exception
+- Async functions for all I/O operations
+
+## Formatting
+- Ruff for lint + format (line-length = 88)
+- Run `ruff check --fix .` before commit
+
+## Security
+- No hardcoded secrets — use .env + python-dotenv
+- Run `bandit -r backend/` for security scan

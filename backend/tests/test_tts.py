@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 import numpy as np
 import pytest
-
 from core.event_bus import EventBus
 from voice.audio_player import AudioPlayer
 from voice.tts import TTSManager
@@ -32,13 +36,13 @@ def _config() -> SimpleNamespace:
 async def test_elevenlabs_synthesis() -> None:
     cfg = _config()
     bus = EventBus()
-    manager = TTSManager(cfg, bus)
+    manager = TTSManager(cast(Any, cfg), bus)
 
-    async def fake_backend(backend: str, text: str):
+    async def fake_backend(backend: str, text: str) -> NDArray[Any]:
         assert backend == "elevenlabs"
         return np.ones(2205, dtype=np.float32) * 0.1
 
-    manager._synthesize_with_backend = fake_backend  # type: ignore[attr-defined]
+    cast(Any, manager)._synthesize_with_backend = fake_backend
 
     audio = await manager.synthesize("hello")
     assert isinstance(audio, np.ndarray)
@@ -47,7 +51,7 @@ async def test_elevenlabs_synthesis() -> None:
 
 @pytest.mark.asyncio
 async def test_local_tts_synthesis() -> None:
-    local = LocalTTS(_config())
+    local = LocalTTS(cast(Any, _config()))
     audio = await local.synthesize("fallback voice")
     assert isinstance(audio, np.ndarray)
     assert audio.dtype == np.float32
@@ -58,14 +62,14 @@ async def test_local_tts_synthesis() -> None:
 async def test_fallback_on_api_error() -> None:
     cfg = _config()
     bus = EventBus()
-    manager = TTSManager(cfg, bus)
+    manager = TTSManager(cast(Any, cfg), bus)
 
-    async def fake_backend(backend: str, text: str):
+    async def fake_backend(backend: str, text: str) -> NDArray[Any]:
         if backend == "elevenlabs":
             raise RuntimeError("api failed")
         return np.ones(1024, dtype=np.float32) * 0.05
 
-    manager._synthesize_with_backend = fake_backend  # type: ignore[attr-defined]
+    cast(Any, manager)._synthesize_with_backend = fake_backend
 
     audio = await manager.synthesize("fallback please")
     assert audio.size == 1024
@@ -75,15 +79,15 @@ async def test_fallback_on_api_error() -> None:
 async def test_streaming_synthesis() -> None:
     cfg = _config()
     bus = EventBus()
-    manager = TTSManager(cfg, bus)
+    manager = TTSManager(cast(Any, cfg), bus)
 
-    async def fake_stream_backend(backend: str, text: str):
+    async def fake_stream_backend(backend: str, text: str) -> AsyncIterator[bytes]:
         yield b"aaa"
         yield b"bbb"
 
-    manager._stream_with_backend = fake_stream_backend  # type: ignore[attr-defined]
+    cast(Any, manager)._stream_with_backend = fake_stream_backend
 
-    async def chunks():
+    async def chunks() -> AsyncIterator[str]:
         yield "Hello world."
         yield " Next sentence!"
 
@@ -99,20 +103,20 @@ async def test_streaming_synthesis() -> None:
 async def test_interruption() -> None:
     cfg = _config()
     bus = EventBus()
-    manager = TTSManager(cfg, bus)
+    manager = TTSManager(cast(Any, cfg), bus)
 
-    async def fake_stream_backend(backend: str, text: str):
+    async def fake_stream_backend(backend: str, text: str) -> AsyncIterator[bytes]:
         for _ in range(20):
             await asyncio.sleep(0)
             yield b"chunk"
 
-    manager._stream_with_backend = fake_stream_backend  # type: ignore[attr-defined]
+    cast(Any, manager)._stream_with_backend = fake_stream_backend
 
-    async def chunks():
+    async def chunks() -> AsyncIterator[str]:
         yield "Long sentence that keeps generating."
 
     emitted = 0
-    async for part in manager.stream_synthesize(chunks()):
+    async for _part in manager.stream_synthesize(chunks()):
         emitted += 1
         if emitted == 2:
             manager.cancel()
@@ -131,7 +135,7 @@ def test_volume_control() -> None:
 def test_backend_mapping_supports_new_backends() -> None:
     cfg = _config()
     bus = EventBus()
-    manager = TTSManager(cfg, bus)
+    manager = TTSManager(cast(Any, cfg), bus)
 
     assert manager._backend("kitten") == "kitten"
     assert manager._backend("edge") == "edge"

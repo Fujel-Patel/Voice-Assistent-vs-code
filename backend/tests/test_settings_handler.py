@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
 import api.settings_handler as settings_module
+import pytest
 from api.settings_handler import SettingsHandler
 
 
 @pytest.mark.asyncio
-async def test_get_settings_returns_payload(mocker) -> None:
+async def test_get_settings_returns_payload(mocker: Any) -> None:
     mocker.patch.object(settings_module, "get_config_dict", return_value={})
     handler = SettingsHandler()
 
@@ -20,7 +21,7 @@ async def test_get_settings_returns_payload(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_setting_calls_save_setting(mocker) -> None:
+async def test_update_setting_calls_save_setting(mocker: Any) -> None:
     mocker.patch.object(settings_module, "get_config_dict", return_value={})
     save_setting = mocker.patch.object(settings_module, "save_setting")
     handler = SettingsHandler()
@@ -33,7 +34,7 @@ async def test_update_setting_calls_save_setting(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_setting_rejects_invalid_value(mocker) -> None:
+async def test_update_setting_rejects_invalid_value(mocker: Any) -> None:
     mocker.patch.object(settings_module, "get_config_dict", return_value={})
     save_setting = mocker.patch.object(settings_module, "save_setting")
     handler = SettingsHandler()

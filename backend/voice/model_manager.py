@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from config.config_loader import JarvisConfig
 from core.logger import get_logger
+
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
 
 logger = get_logger(__name__)
 
@@ -15,13 +19,13 @@ AVAILABLE_MODELS = {"tiny", "base", "small", "medium", "large-v3"}
 class ModelManager:
     """Handles local faster-whisper model loading and switching."""
 
-    def __init__(self, config: JarvisConfig):
+    def __init__(self, config: JarvisConfig) -> None:
         self._config = config
         self._loaded_model_name: str | None = None
-        self._model = None
+        self._model: WhisperModel | None = None
 
     @property
-    def model(self):
+    def model(self) -> WhisperModel | None:
         return self._model
 
     @property
@@ -36,10 +40,12 @@ class ModelManager:
         self,
         model_name: str | None = None,
         progress_cb: Callable[[str], None] | None = None,
-    ):
+    ) -> WhisperModel:
         target = model_name or self._config.stt.model
         if target not in AVAILABLE_MODELS:
-            raise ValueError(f"Unsupported model '{target}'. Allowed: {sorted(AVAILABLE_MODELS)}")
+            raise ValueError(
+                f"Unsupported model '{target}'. Allowed: {sorted(AVAILABLE_MODELS)}"
+            )
 
         if self._loaded_model_name == target and self._model is not None:
             return self._model
@@ -67,7 +73,9 @@ class ModelManager:
             progress_cb(f"Whisper model ready: {target}")
             logger.info(f"Whisper model loaded: {target}")
         except Exception as exc:
-            logger.warning(f"Model load on preferred compute type failed: {exc}. Retrying on CPU/float32")
+            logger.warning(
+                f"Model load on preferred compute type failed: {exc}. Retrying on CPU/float32"
+            )
             self._model = WhisperModel(
                 target,
                 download_root=str(MODELS_DIR),
@@ -81,5 +89,5 @@ class ModelManager:
         model_path.mkdir(parents=True, exist_ok=True)
         return self._model
 
-    async def switch_model(self, model_name: str):
+    async def switch_model(self, model_name: str) -> WhisperModel:
         return await self.ensure_loaded(model_name=model_name)

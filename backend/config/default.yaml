@@ -9,11 +9,11 @@ wake_word:
 audio:
   sample_rate: 16000
   channels: 1
-  silence_threshold: 2.0
+  silence_threshold: 4.0
   max_recording_duration: 30
-  min_recording_duration: 0.5
-  no_speech_timeout: 2.5
-  silence_stop_seconds: 1.0
+  min_recording_duration: 1.5
+  no_speech_timeout: 5.0
+  silence_stop_seconds: 2.0
 
 stt:
   engine: "moonshine"

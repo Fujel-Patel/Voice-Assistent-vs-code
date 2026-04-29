@@ -4,9 +4,9 @@ import logging
 import sys
 from pathlib import Path
 
-from loguru import logger as _logger
-
 from config.config_loader import load_config
+from loguru import Logger
+from loguru import logger as _logger
 
 
 class _WebSocketNoiseFilter(logging.Filter):
@@ -65,7 +65,7 @@ def _configure_logger() -> None:
 _configured = False
 
 
-def get_logger(name: str):
+def get_logger(name: str) -> Logger:
     global _configured
     if not _configured:
         _configure_logger()

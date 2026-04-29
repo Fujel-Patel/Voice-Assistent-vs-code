@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import importlib.util
 import threading
 import time
 from collections.abc import Callable
-import asyncio
-import importlib.util
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-
 from config.config_loader import JarvisConfig
 from core.error_handler import MicrophoneError
 from core.event_bus import EventBus
@@ -32,13 +32,17 @@ class WakeWordDetector:
         self._on_wake_word = on_wake_word
         self._loop = event_loop
         self._stop_event = threading.Event()
+        self._paused_event = threading.Event()
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, name="wake-word-listener", daemon=True)
+        self._paused_event.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="wake-word-listener", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -46,8 +50,20 @@ class WakeWordDetector:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
 
-    def _emit_async(self, event_name: str, payload: dict) -> None:
-        asyncio.run_coroutine_threadsafe(self._event_bus.publish(event_name, payload), self._loop)
+    def pause(self) -> None:
+        """Temporarily release the microphone."""
+        self._paused_event.set()
+        logger.info("Wake word detector requested to pause")
+
+    def resume(self) -> None:
+        """Re-acquire the microphone."""
+        self._paused_event.clear()
+        logger.info("Wake word detector requested to resume")
+
+    def _emit_async(self, event_name: str, payload: dict[str, Any]) -> None:
+        asyncio.run_coroutine_threadsafe(
+            self._event_bus.publish(event_name, payload), self._loop
+        )
 
     def _run(self) -> None:
         try:
@@ -66,7 +82,9 @@ class WakeWordDetector:
             return
 
         sensitivity = max(0.0, min(1.0, self._config.wake_word.sensitivity))
-        vad_threshold = max(0.0, min(1.0, self._config.wake_word.openwakeword_vad_threshold))
+        vad_threshold = max(
+            0.0, min(1.0, self._config.wake_word.openwakeword_vad_threshold)
+        )
         keyword = (self._config.wake_word.keyword or "jarvis").lower()
         keyword_aliases = self._keyword_aliases(keyword)
         model_path = (self._config.wake_word.openwakeword_model_path or "").strip()
@@ -95,7 +113,9 @@ class WakeWordDetector:
             try:
                 openwakeword.utils.download_models()
             except AttributeError:
-                logger.warning("openWakeWord download_models not available in this version")
+                logger.warning(
+                    "openWakeWord download_models not available in this version"
+                )
             except Exception as exc:
                 logger.warning(f"openWakeWord model download skipped: {exc}")
 
@@ -108,7 +128,9 @@ class WakeWordDetector:
             audio = None
             stream = None
             try:
-                detector = self._init_detector_with_fallback(openwakeword, OpenWakeWordModel, model_kwargs)
+                detector = self._init_detector_with_fallback(
+                    openwakeword, OpenWakeWordModel, model_kwargs
+                )
 
                 audio = pyaudio.PyAudio()
                 stream = audio.open(
@@ -119,10 +141,51 @@ class WakeWordDetector:
                     frames_per_buffer=1280,
                 )
                 self._emit_async("listener_started", {"keyword": keyword})
-                logger.info(f"Wake word detector started (keyword={keyword}, sensitivity={sensitivity})")
+                logger.info(
+                    f"Wake word detector started (keyword={keyword}, sensitivity={sensitivity})"
+                )
                 last_detection_at = 0.0
 
                 while not self._stop_event.is_set():
+                    if self._paused_event.is_set():
+                        # Release mic while paused
+                        logger.info("Wake word detector pausing: releasing microphone")
+                        if stream is not None:
+                            try:
+                                stream.stop_stream()
+                                stream.close()
+                            except Exception:
+                                pass
+                            stream = None
+                        if audio is not None:
+                            try:
+                                audio.terminate()
+                            except Exception:
+                                pass
+                            audio = None
+
+                        while (
+                            self._paused_event.is_set()
+                            and not self._stop_event.is_set()
+                        ):
+                            time.sleep(0.1)
+
+                        if self._stop_event.is_set():
+                            break
+
+                        # Re-open mic
+                        logger.info(
+                            "Wake word detector resuming: re-acquiring microphone"
+                        )
+                        audio = pyaudio.PyAudio()
+                        stream = audio.open(
+                            rate=16000,
+                            channels=1,
+                            format=pyaudio.paInt16,
+                            input=True,
+                            frames_per_buffer=1280,
+                        )
+
                     pcm = stream.read(1280, exception_on_overflow=False)
                     frame = np.frombuffer(pcm, dtype=np.int16)
                     scores = detector.predict(frame)
@@ -131,7 +194,9 @@ class WakeWordDetector:
                     if top_score >= sensitivity and (now - last_detection_at) >= 1.0:
                         last_detection_at = now
                         self._emit_async("wake_word_detected", {"keyword": keyword})
-                        logger.info(f"Wake word detected (model={top_model}, score={top_score:.3f})")
+                        logger.info(
+                            f"Wake word detected (model={top_model}, score={top_score:.3f})"
+                        )
                         self._on_wake_word()
 
                 return
@@ -170,7 +235,9 @@ class WakeWordDetector:
                 except Exception:
                     pass
 
-    def _init_detector_with_fallback(self, openwakeword: object, model_cls: object, model_kwargs: dict[str, object]):
+    def _init_detector_with_fallback(
+        self, openwakeword: Any, model_cls: Any, model_kwargs: dict[str, Any]
+    ) -> Any:
         try:
             return model_cls(**model_kwargs)
         except Exception as exc:
@@ -188,9 +255,11 @@ class WakeWordDetector:
             model_kwargs["wakeword_models"] = available_models
             return model_cls(**model_kwargs)
 
-    def _discover_onnx_models(self, openwakeword: object) -> list[str]:
+    def _discover_onnx_models(self, openwakeword: Any) -> list[str]:
         try:
-            models_dir = Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+            models_dir = (
+                Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+            )
         except Exception:
             return []
 
@@ -198,11 +267,17 @@ class WakeWordDetector:
             return []
 
         # Exclude VAD files; wakeword_models should only include wake-word detectors.
-        return [str(p) for p in sorted(models_dir.glob("*.onnx")) if "vad" not in p.name.lower()]
+        return [
+            str(p)
+            for p in sorted(models_dir.glob("*.onnx"))
+            if "vad" not in p.name.lower()
+        ]
 
-    def _ensure_openwakeword_onnx_assets(self, openwakeword: object) -> None:
+    def _ensure_openwakeword_onnx_assets(self, openwakeword: Any) -> None:
         try:
-            models_dir = Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+            models_dir = (
+                Path(openwakeword.__file__).resolve().parent / "resources" / "models"
+            )
             models_dir.mkdir(parents=True, exist_ok=True)
         except Exception as exc:
             logger.warning(f"Unable to resolve openWakeWord models directory: {exc}")
@@ -229,7 +304,9 @@ class WakeWordDetector:
         if not missing_urls:
             return
 
-        logger.info(f"Downloading missing openWakeWord ONNX assets ({len(missing_urls)})")
+        logger.info(
+            f"Downloading missing openWakeWord ONNX assets ({len(missing_urls)})"
+        )
         for url in missing_urls:
             try:
                 openwakeword.utils.download_file(url, target_directory=str(models_dir))
@@ -244,7 +321,9 @@ class WakeWordDetector:
             aliases.add(f"hey{normalized}")
         return {alias for alias in aliases if alias}
 
-    def _best_score(self, scores: object, keyword_aliases: set[str]) -> tuple[str, float]:
+    def _best_score(
+        self, scores: object, keyword_aliases: set[str]
+    ) -> tuple[str, float]:
         if not isinstance(scores, dict):
             return "unknown", 0.0
 
@@ -257,7 +336,9 @@ class WakeWordDetector:
                 continue
 
             canonical = str(model_name).lower().replace(" ", "_").replace("-", "_")
-            if keyword_aliases and not any(alias in canonical for alias in keyword_aliases):
+            if keyword_aliases and not any(
+                alias in canonical for alias in keyword_aliases
+            ):
                 continue
 
             if score > best_score:

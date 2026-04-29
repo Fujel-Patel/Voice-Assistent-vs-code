@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
-
 from config.config_loader import load_config
 from core.logger import get_logger
 from core.retry import retry
@@ -33,7 +32,9 @@ class BraveSearch:
         return await self._search_endpoint("images/search", query, count=count)
 
     @retry(max_retries=2, base_delay=0.5)
-    async def _search_endpoint(self, endpoint: str, query: str, count: int = 5) -> list[dict[str, Any]]:
+    async def _search_endpoint(
+        self, endpoint: str, query: str, count: int = 5
+    ) -> list[dict[str, Any]]:
         query = (query or "").strip()
         if not query:
             return []
@@ -61,7 +62,9 @@ class BraveSearch:
 
         url = f"https://api.search.brave.com/res/v1/{endpoint}"
         async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.get(url, headers=headers, params=params)
+            response = await client.get(
+                url, headers=headers, params=cast(dict[str, Any], params)
+            )
 
         if response.status_code == 429:
             raise RuntimeError("brave_rate_limited")
@@ -73,7 +76,9 @@ class BraveSearch:
         self._cache[key] = (now, results)
         return results
 
-    def _normalize_results(self, endpoint: str, data: dict[str, Any]) -> list[dict[str, Any]]:
+    def _normalize_results(
+        self, endpoint: str, data: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         if endpoint == "images/search":
             items = data.get("results", []) or data.get("images", {}).get("results", [])
             return [
@@ -81,7 +86,9 @@ class BraveSearch:
                     "title": item.get("title", ""),
                     "url": item.get("url", ""),
                     "description": item.get("description", ""),
-                    "thumbnail": item.get("thumbnail", {}).get("src") if isinstance(item.get("thumbnail"), dict) else item.get("thumbnail"),
+                    "thumbnail": item.get("thumbnail", {}).get("src")
+                    if isinstance(item.get("thumbnail"), dict)
+                    else item.get("thumbnail"),
                     "age": item.get("age", ""),
                 }
                 for item in items

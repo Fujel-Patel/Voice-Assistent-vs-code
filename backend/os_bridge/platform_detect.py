@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 from dataclasses import asdict, dataclass
+from typing import Any
 
 
 @dataclass
@@ -15,7 +16,7 @@ class PlatformInfo:
     available_tools: list[str]
     package_managers: list[str]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -40,7 +41,15 @@ def _detect_display_server() -> str:
 
 def _available_tools_for(current_os: str) -> list[str]:
     tools_map = {
-        "linux": ["xdotool", "wmctrl", "pactl", "xrandr", "loginctl", "gnome-screenshot", "scrot"],
+        "linux": [
+            "xdotool",
+            "wmctrl",
+            "pactl",
+            "xrandr",
+            "loginctl",
+            "gnome-screenshot",
+            "scrot",
+        ],
         "windows": ["powershell", "taskkill", "nircmd"],
         "macos": ["osascript", "pmset", "screencapture"],
     }
@@ -49,7 +58,17 @@ def _available_tools_for(current_os: str) -> list[str]:
 
 
 def _detect_package_managers() -> list[str]:
-    managers = ["apt", "dnf", "pacman", "zypper", "snap", "flatpak", "brew", "winget", "choco"]
+    managers = [
+        "apt",
+        "dnf",
+        "pacman",
+        "zypper",
+        "snap",
+        "flatpak",
+        "brew",
+        "winget",
+        "choco",
+    ]
     return [name for name in managers if shutil.which(name)]
 
 

@@ -81,11 +81,19 @@ echo -e "${CYAN}Installing Python dependencies (this may take a few minutes)...$
 pip install -r requirements.txt
 echo -e "${GREEN}✓ Python dependencies installed${NC}"
 
-# Explicitly install openwakeword with fallback
+# Explicitly install dependencies that often cause issues with openwakeword
+echo -e "${CYAN}Installing AI runtime dependencies...${NC}"
+# Try tflite-runtime, then its newer name ai-edge-litert, then just stick with onnxruntime
+if ! pip install tflite-runtime -q 2>/dev/null; then
+  echo -e "${YELLOW}⚠ tflite-runtime not found. Trying ai-edge-litert (modern replacement)...${NC}"
+  pip install ai-edge-litert -q 2>/dev/null || echo -e "${YELLOW}⚠ TFLite runtimes unavailable. openWakeWord will use ONNX only.${NC}"
+fi
+pip install onnxruntime-gpu onnxruntime -q 2>/dev/null || pip install onnxruntime -q
+
 echo -e "${CYAN}Installing openWakeWord...${NC}"
-if ! pip install openwakeword==0.6.0; then
-  echo -e "${YELLOW}⚠ Regular openWakeWord install failed. Trying ONNX-only fallback (--no-deps)...${NC}"
-  pip install --no-deps openwakeword==0.6.0
+if ! pip install openwakeword==0.6.0 -q; then
+  echo -e "${YELLOW}⚠ Regular openWakeWord install failed (likely dependency conflict). Trying ONNX-only mode...${NC}"
+  pip install --no-deps openwakeword==0.6.0 -q
   echo -e "${GREEN}✓ openWakeWord installed (ONNX-only mode)${NC}"
 else
   echo -e "${GREEN}✓ openWakeWord installed${NC}"
@@ -93,8 +101,9 @@ fi
 
 if command -v apt &>/dev/null; then
   echo -e "${CYAN}Installing Linux system packages...${NC}"
-  sudo apt update
-  sudo apt install -y tesseract-ocr portaudio19-dev
+  # Silence architecture warnings and skip recommendations
+  sudo apt-get update -qq -o Acquire::Languages=none
+  sudo apt-get install -y -qq --no-install-recommends tesseract-ocr portaudio19-dev
 fi
 
 deactivate
@@ -102,7 +111,8 @@ deactivate
 # ── Node.js dependencies ─────────────────────────────────
 echo -e "\n${BOLD}Installing Node.js dependencies...${NC}"
 cd "$FRONTEND_DIR"
-npm install
+# Use --no-audit to skip the high-volume vulnerability warnings during setup
+npm install --no-audit --quiet
 echo -e "${GREEN}✓ Node.js dependencies installed${NC}"
 
 # ── Environment file ─────────────────────────────────────

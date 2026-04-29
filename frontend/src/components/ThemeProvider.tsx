@@ -16,10 +16,10 @@ export function ThemeProvider({ children, defaultTheme = 'dark', storageKey = 'j
   storageKey?: string
 }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return defaultTheme
+    if (typeof window === 'undefined') return 'dark'
     const stored = localStorage.getItem(storageKey)
     if (stored === 'dark' || stored === 'light') return stored
-    return defaultTheme
+    return 'dark'
   })
 
   useEffect(() => {

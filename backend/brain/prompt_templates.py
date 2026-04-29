@@ -44,13 +44,13 @@ Intent categories:
 
 
 def build_system_prompt(capabilities_text: str = "") -> str:
-  if not capabilities_text.strip():
-    return _BASE_SYSTEM_PROMPT
-  return (
-    f"{_BASE_SYSTEM_PROMPT}\n\n"
-    "Available live plugin capabilities:\n"
-    f"{capabilities_text.strip()}"
-  )
+    if not capabilities_text.strip():
+        return _BASE_SYSTEM_PROMPT
+    return (
+        f"{_BASE_SYSTEM_PROMPT}\n\n"
+        "Available live plugin capabilities:\n"
+        f"{capabilities_text.strip()}"
+    )
 
 
 GEMINI_SYSTEM_PROMPT = build_system_prompt()

@@ -32,7 +32,9 @@ class ProcessManager:
             stderr=asyncio.subprocess.PIPE,
         )
         self._restart_count = 0
-        logger.info(f"Started process pid={self._process.pid} cmd={' '.join(self.command)}")
+        logger.info(
+            f"Started process pid={self._process.pid} cmd={' '.join(self.command)}"
+        )
         return self._process.pid or -1
 
     async def restart(self) -> int:
@@ -71,7 +73,7 @@ class ProcessManager:
             self._process.terminate()
             try:
                 await asyncio.wait_for(self._process.wait(), timeout=8.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._process.kill()
                 await self._process.wait()
         logger.info("Managed process stopped")

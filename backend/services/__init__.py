@@ -6,10 +6,10 @@ from services.url_summarizer import URLSummarizer
 from services.web_fetcher import WebFetcher
 
 __all__ = [
-	"BraveSearch",
-	"DuckDuckGoSearch",
-	"ProcessManager",
-	"StartupManager",
-	"WebFetcher",
-	"URLSummarizer",
+    "BraveSearch",
+    "DuckDuckGoSearch",
+    "ProcessManager",
+    "StartupManager",
+    "WebFetcher",
+    "URLSummarizer",
 ]

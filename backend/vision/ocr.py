@@ -3,19 +3,29 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from collections import OrderedDict
+from typing import TYPE_CHECKING, Any
 
-try:
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+
+if TYPE_CHECKING:
     from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-except Exception:  # pragma: no cover
-    Image = None
-    ImageEnhance = None
-    ImageFilter = None
-    ImageOps = None
+else:
+    try:
+        from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+    except ImportError:
+        Image = Any
+        ImageEnhance = Any
+        ImageFilter = Any
+        ImageOps = Any
 
-try:
+if TYPE_CHECKING:
     import pytesseract
-except Exception:  # pragma: no cover
-    pytesseract = None
+else:
+    try:
+        import pytesseract
+    except ImportError:
+        pytesseract = Any
 
 from core.logger import get_logger
 
@@ -28,7 +38,7 @@ class OCREngine:
         self.cache_size = cache_size
         self._cache: OrderedDict[str, str] = OrderedDict()
 
-    async def extract_text(self, image) -> str:
+    async def extract_text(self, image: PILImage) -> str:
         key = self._image_hash(image)
         if key in self._cache:
             self._cache.move_to_end(key)
@@ -40,37 +50,47 @@ class OCREngine:
             self._cache.popitem(last=False)
         return text
 
-    async def extract_regions(self, image) -> list[dict]:
+    async def extract_regions(self, image: PILImage) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self._extract_regions_sync, image)
 
-    async def extract_from_region(self, image, x: int, y: int, w: int, h: int) -> str:
+    async def extract_from_region(
+        self, image: PILImage, x: int, y: int, w: int, h: int
+    ) -> str:
         region = image.crop((x, y, x + w, y + h))
         return await self.extract_text(region)
 
-    def _extract_text_sync(self, image) -> str:
+    def _extract_text_sync(self, image: PILImage) -> str:
         if pytesseract is None or Image is None:
-            raise RuntimeError("OCR dependencies unavailable. Install pytesseract and Pillow.")
+            raise RuntimeError(
+                "OCR dependencies unavailable. Install pytesseract and Pillow."
+            )
 
         if image is None or image.size[0] == 0 or image.size[1] == 0:
             return ""
 
         prepared = self._prepare(image)
         try:
-            text = pytesseract.image_to_string(prepared, lang=self.languages)
+            text = str(pytesseract.image_to_string(prepared, lang=self.languages))
             return text.strip()
         except pytesseract.pytesseract.TesseractNotFoundError as exc:
-            raise RuntimeError("Tesseract not installed. Install with: sudo apt install tesseract-ocr") from exc
+            raise RuntimeError(
+                "Tesseract not installed. Install with: sudo apt install tesseract-ocr"
+            ) from exc
 
-    def _extract_regions_sync(self, image) -> list[dict]:
+    def _extract_regions_sync(self, image: PILImage) -> list[dict[str, Any]]:
         if pytesseract is None or Image is None:
-            raise RuntimeError("OCR dependencies unavailable. Install pytesseract and Pillow.")
+            raise RuntimeError(
+                "OCR dependencies unavailable. Install pytesseract and Pillow."
+            )
 
         if image is None or image.size[0] == 0 or image.size[1] == 0:
             return []
 
         prepared = self._prepare(image)
-        data = pytesseract.image_to_data(prepared, output_type=pytesseract.Output.DICT, lang=self.languages)
-        result: list[dict] = []
+        data = pytesseract.image_to_data(
+            prepared, output_type=pytesseract.Output.DICT, lang=self.languages
+        )
+        result: list[dict[str, Any]] = []
 
         count = len(data.get("text", []))
         for i in range(count):
@@ -100,18 +120,20 @@ class OCREngine:
 
         return result
 
-    def _prepare(self, image):
+    def _prepare(self, image: PILImage) -> PILImage:
         if Image is None:
             return image
 
         gray = ImageOps.grayscale(image)
         contrast = ImageEnhance.Contrast(gray).enhance(1.7)
         if contrast.width < 1200:
-            contrast = contrast.resize((contrast.width * 2, contrast.height * 2), Image.Resampling.LANCZOS)
+            contrast = contrast.resize(
+                (contrast.width * 2, contrast.height * 2), Image.Resampling.LANCZOS
+            )
         denoised = contrast.filter(ImageFilter.MedianFilter(size=3))
         return denoised
 
-    def _image_hash(self, image) -> str:
+    def _image_hash(self, image: PILImage) -> str:
         if Image is None:
             return ""
         raw = image.tobytes()

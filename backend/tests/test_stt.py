@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
 import pytest
-
 from config.config_loader import JarvisConfig
 from voice.stt import SpeechToText
 
 
 @pytest.mark.asyncio
-async def test_transcribe_valid_audio(mock_audio):
+async def test_transcribe_valid_audio(mock_audio: NDArray[Any]) -> None:
     cfg = JarvisConfig()
 
     segment = SimpleNamespace(text="open visual studio code", avg_logprob=-0.2)
@@ -32,7 +36,7 @@ async def test_transcribe_valid_audio(mock_audio):
 
 
 @pytest.mark.asyncio
-async def test_transcribe_empty_audio():
+async def test_transcribe_empty_audio() -> None:
     cfg = JarvisConfig()
     manager = MagicMock()
     manager.ensure_loaded = AsyncMock()
@@ -46,7 +50,7 @@ async def test_transcribe_empty_audio():
 
 
 @pytest.mark.asyncio
-async def test_model_not_loaded_triggers_download(mock_audio):
+async def test_model_not_loaded_triggers_download(mock_audio: NDArray[Any]) -> None:
     cfg = JarvisConfig()
 
     segment = SimpleNamespace(text="turn on bluetooth", avg_logprob=-0.5)
@@ -65,7 +69,7 @@ async def test_model_not_loaded_triggers_download(mock_audio):
 
 
 @pytest.mark.asyncio
-async def test_language_detection(mock_audio):
+async def test_language_detection(mock_audio: NDArray[Any]) -> None:
     cfg = JarvisConfig()
 
     segment = SimpleNamespace(text="hola mundo", avg_logprob=-0.3)

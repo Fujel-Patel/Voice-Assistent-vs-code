@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import numpy as np
-
 from core.logger import get_logger
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
+    from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
@@ -18,12 +22,14 @@ except ImportError:
 class KittenTTS:
     """Optional KittenTTS backend with streaming PCM output."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: JarvisConfig) -> None:
         self.config = config
         self._cancelled = False
         self.available = _KittenEngine is not None
         self.voice = (getattr(config.tts, "kitten_voice", "alloy") or "alloy").strip()
-        self.model_name = (getattr(config.tts, "kitten_model", "kitten-1") or "kitten-1").strip()
+        self.model_name = (
+            getattr(config.tts, "kitten_model", "kitten-1") or "kitten-1"
+        ).strip()
         self.sample_rate = int(config.tts.sample_rate)
 
         self._engine = None
@@ -37,12 +43,12 @@ class KittenTTS:
     def cancel(self) -> None:
         self._cancelled = True
 
-    async def synthesize(self, text: str) -> np.ndarray:
+    async def synthesize(self, text: str) -> NDArray[np.float32]:
         if not self.available or self._engine is None:
             raise RuntimeError("KittenTTS backend unavailable")
 
         self._cancelled = False
-        chunks: list[np.ndarray] = []
+        chunks: list[NDArray[np.float32]] = []
 
         for chunk in self._engine.synthesize_streaming(text, voice=self.voice):
             if self._cancelled:

@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import TypeVar
+from typing import ParamSpec, TypeVar
 
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
+P = ParamSpec("P")
 T = TypeVar("T")
 
 
@@ -17,12 +18,12 @@ def retry(
     base_delay: float = 1.0,
     max_delay: float = 30.0,
     exceptions_to_retry: tuple[type[BaseException], ...] = (Exception,),
-) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """Retry async call with exponential backoff."""
 
-    def decorator(fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    def decorator(fn: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         @wraps(fn)
-        async def wrapper(*args, **kwargs) -> T:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             attempt = 0
             while True:
                 try:

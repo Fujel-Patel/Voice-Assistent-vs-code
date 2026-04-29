@@ -210,21 +210,21 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-full p-6">
-      <header className="flex items-start justify-between mb-6 gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-6">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Jarvis Settings</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Tune behavior, voice, AI, and visual interface in real time.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Jarvis Settings</h2>
+          <p className="mt-1 text-muted-foreground">Tune behavior, voice, AI, and visual interface in real time.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 border border-white/10 transition-all"
+            className="flex items-center justify-center gap-2 w-36 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 border border-white/10 transition-all shadow-sm"
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="w-4 h-4" />
             HUD View
           </button>
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 border border-white/10 transition-all"
+            className="flex items-center justify-center gap-2 w-36 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all shadow-sm"
             onClick={() => navigate('/dashboard')}
           >
             <LayoutDashboard className="w-4 h-4" />

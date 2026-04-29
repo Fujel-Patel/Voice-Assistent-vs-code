@@ -9,17 +9,21 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import soundfile as sf
-
 from core.logger import get_logger
+
+if TYPE_CHECKING:
+    from config.config_loader import JarvisConfig
+    from numpy.typing import NDArray
 
 logger = get_logger(__name__)
 
 
 class LocalTTS:
-    def __init__(self, config) -> None:
+    def __init__(self, config: JarvisConfig) -> None:
         self.config = config
         self.sample_rate = int(config.tts.sample_rate)
         self._cancelled = False
@@ -29,7 +33,7 @@ class LocalTTS:
     def cancel(self) -> None:
         self._cancelled = True
 
-    def _jarvis_effect(self, audio: np.ndarray) -> np.ndarray:
+    def _jarvis_effect(self, audio: NDArray[np.float32]) -> NDArray[np.float32]:
         if audio.size == 0:
             return audio
         delay = int(0.035 * self.sample_rate)
@@ -42,7 +46,7 @@ class LocalTTS:
         out = out / peak
         return np.clip(out, -1.0, 1.0)
 
-    async def synthesize(self, text: str) -> np.ndarray:
+    async def synthesize(self, text: str) -> NDArray[np.float32]:
         self._cancelled = False
         speech = await self._synthesize_with_espeak(text)
         if speech is not None and speech.size:
@@ -52,7 +56,9 @@ class LocalTTS:
         if speech is not None and speech.size:
             return speech
 
-        logger.warning("No local speech backend available (espeak/pyttsx3); returning silent fallback audio")
+        logger.warning(
+            "No local speech backend available (espeak/pyttsx3); returning silent fallback audio"
+        )
         # Keep pipeline healthy without producing unpleasant tone artifacts.
         duration = max(0.2, min(2.0, len(text) / 24.0))
         n = max(1, int(duration * self.sample_rate))
@@ -68,16 +74,21 @@ class LocalTTS:
             yield pcm[i : i + chunk_size]
             await asyncio.sleep(0)
 
-    async def _synthesize_with_pyttsx3(self, text: str) -> np.ndarray | None:
+    async def _synthesize_with_pyttsx3(self, text: str) -> NDArray[np.float32] | None:
         if not text.strip():
             return np.zeros(1, dtype=np.float32)
 
-        def _render_wav() -> tuple[np.ndarray, int] | None:
+        def _render_wav() -> tuple[NDArray[Any], int] | None:
             wav_path = None
             try:
-                wav_path = str(Path(tempfile.gettempdir()) / f"jarvis_pyttsx3_{uuid.uuid4().hex}.wav")
+                wav_path = str(
+                    Path(tempfile.gettempdir())
+                    / f"jarvis_pyttsx3_{uuid.uuid4().hex}.wav"
+                )
 
-                scaled_rate = int(175 * max(0.6, min(1.6, float(self.config.tts.speaking_rate))))
+                scaled_rate = int(
+                    175 * max(0.6, min(1.6, float(self.config.tts.speaking_rate)))
+                )
                 pyttsx3_script = (
                     "import sys\n"
                     "import pyttsx3\n"
@@ -94,7 +105,14 @@ class LocalTTS:
                     "    pass\n"
                 )
                 subprocess.run(
-                    [sys.executable, "-c", pyttsx3_script, wav_path, text, str(scaled_rate)],
+                    [
+                        sys.executable,
+                        "-c",
+                        pyttsx3_script,
+                        wav_path,
+                        text,
+                        str(scaled_rate),
+                    ],
                     check=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -130,7 +148,7 @@ class LocalTTS:
             audio = self._resample(audio, sr, self.sample_rate)
         return self._jarvis_effect(audio.astype(np.float32))
 
-    async def _synthesize_with_espeak(self, text: str) -> np.ndarray | None:
+    async def _synthesize_with_espeak(self, text: str) -> NDArray[np.float32] | None:
         if not text.strip():
             return np.zeros(1, dtype=np.float32)
 
@@ -138,16 +156,24 @@ class LocalTTS:
         if not speech_cli:
             return None
 
-        def _render_wav() -> tuple[np.ndarray, int] | None:
+        def _render_wav() -> tuple[NDArray[Any], int] | None:
             wav_path = None
             try:
                 with NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     wav_path = tmp.name
 
                 base_speed = 175
-                speed = int(base_speed * max(0.6, min(1.6, float(self.config.tts.speaking_rate))))
+                speed = int(
+                    base_speed
+                    * max(0.6, min(1.6, float(self.config.tts.speaking_rate)))
+                )
                 cmd = [speech_cli, "-s", str(speed), "-w", wav_path, text]
-                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
 
                 audio, sr = sf.read(wav_path, dtype="float32")
                 if isinstance(audio, np.ndarray) and audio.ndim > 1:
@@ -172,7 +198,9 @@ class LocalTTS:
             audio = self._resample(audio, sr, self.sample_rate)
         return self._jarvis_effect(audio.astype(np.float32))
 
-    def _resample(self, audio: np.ndarray, src_rate: int, dst_rate: int) -> np.ndarray:
+    def _resample(
+        self, audio: NDArray[np.float32], src_rate: int, dst_rate: int
+    ) -> NDArray[np.float32]:
         if src_rate == dst_rate or audio.size == 0:
             return audio
         duration = len(audio) / float(src_rate)

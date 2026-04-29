@@ -1,43 +1,57 @@
 # Python
-backend/.venv/
-backend/__pycache__/
-backend/**/__pycache__/
-backend/**/*.pyc
-backend/**/*.pyo
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 backend/data/
 backend/logs/
 
 # Models (large files)
 models/
 
-# Environment
-.env
-*.env.local
-
-# Node.js
+# Frontend (Node.js)
 frontend/node_modules/
 frontend/dist/
 frontend/dist-electron/
+frontend/.npm/
+node_modules/
 
-# Electron build
-frontend/dist-electron/
+# Environment / Secrets
+.env
+.env.*
+!.env.example
 
 # OS
 .DS_Store
 Thumbs.db
 *.swp
+*.bak
 
 # Editors
 .vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.suo
 *.user
 
-# Test artifacts
-.pytest_cache/
-**/.vitest/
-coverage/
-htmlcov/
+# Project Specific / Artifacts
+audit/
+graphify-out/
+console-all.txt
+console-errors.txt
+scratch.py
+skills-lock.json
 
-# Misc
-*.log
+# Tooling
+.agent/
+.agents/
+.claude/
+.windsurf/
+.playwright-mcp/

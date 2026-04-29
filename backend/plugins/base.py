@@ -33,10 +33,12 @@ class JarvisPlugin(abc.ABC):
     enabled: bool = True
 
     @abc.abstractmethod
-    async def execute(self, intent: dict, context: dict) -> PluginResult | dict[str, Any]:
+    async def execute(
+        self, intent: dict[str, Any], context: dict[str, Any]
+    ) -> PluginResult | dict[str, Any]:
         raise NotImplementedError
 
-    async def can_execute(self, intent: dict) -> bool:
+    async def can_execute(self, intent: dict[str, Any]) -> bool:
         intent_type = intent.get("type") or intent.get("intent")
         return intent_type in self.intents
 
@@ -53,4 +55,6 @@ class JarvisPlugin(abc.ABC):
         ]
 
     def __repr__(self) -> str:
-        return f"<Plugin name={self.name} intents={self.intents} enabled={self.enabled}>"
+        return (
+            f"<Plugin name={self.name} intents={self.intents} enabled={self.enabled}>"
+        )
