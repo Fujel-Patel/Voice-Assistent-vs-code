@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 from plugins.web_search import WebSearchPlugin
-from services.brave_search import BraveSearch
-from services.duckduckgo import DuckDuckGoSearch
-from services.url_summarizer import URLSummarizer
-from services.web_fetcher import WebFetcher
+from services.web.brave_search import BraveSearch
+from services.web.duckduckgo import DuckDuckGoSearch
+from services.web.url_summarizer import URLSummarizer
+from services.web.web_fetcher import WebFetcher
 
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ async def test_brave_search(mocker: Any) -> None:
                 }
             }
 
-    client = mocker.patch("services.brave_search.httpx.AsyncClient")
+    client = mocker.patch("services.web.brave_search.httpx.AsyncClient")
     client.return_value.__aenter__.return_value.get = mocker.AsyncMock(
         return_value=Resp()
     )
@@ -89,7 +89,7 @@ async def test_web_fetcher(mocker: Any) -> None:
         text = "<html><head><title>Hello</title></head><body><p>World</p></body></html>"
         url = "https://example.com"
 
-    client = mocker.patch("services.web_fetcher.httpx.AsyncClient")
+    client = mocker.patch("services.web.web_fetcher.httpx.AsyncClient")
     client.return_value.__aenter__.return_value.get = mocker.AsyncMock(
         return_value=Resp()
     )
@@ -141,7 +141,7 @@ async def test_search_caching(mocker: Any) -> None:
             }
 
     get_mock = mocker.AsyncMock(return_value=Resp())
-    client = mocker.patch("services.brave_search.httpx.AsyncClient")
+    client = mocker.patch("services.web.brave_search.httpx.AsyncClient")
     client.return_value.__aenter__.return_value.get = get_mock
 
     first = await brave.search("cache me")

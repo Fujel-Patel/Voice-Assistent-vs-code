@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from cryptography.fernet import Fernet
     from numpy.typing import NDArray
 from core.logger import get_logger
-from storage.db import get_db
+from infrastructure.database.db import get_db
 
 from .embeddings import SpeakerEmbeddingEngine
 

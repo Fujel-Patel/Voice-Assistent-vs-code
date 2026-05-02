@@ -19,7 +19,7 @@ class SystemControlPlugin(JarvisPlugin):
     description = "Control system settings like volume, brightness, and power"
     intents = ["system-control"]
 
-    ACTIONS = {
+    ACTIONS: dict[str, str] = {
         "volume_up": "Increase volume by 10%",
         "volume_down": "Decrease volume by 10%",
         "volume_set": "Set volume to specific level",

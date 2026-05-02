@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Mic, MicOff, Settings, Sun, Moon, Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useTheme } from '../components/ThemeProvider'
-import JarvisReactor from '../components/JarvisReactor'
+import { lazy, Suspense } from 'react'
+const JarvisReactor = lazy(() => import('../components/JarvisReactor'))
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAppStore } from '../store/appStore'
 import { sanitizeAssistantText } from '../utils/textSanitizer'
@@ -58,6 +59,7 @@ export default function MainPage() {
   const inputRef = useRef(null)
   const manualSessionActiveRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const transcriptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { liveUserTextRef.current = liveUserText }, [liveUserText])
   useEffect(() => { liveAssistantTextRef.current = liveAssistantText }, [liveAssistantText])
@@ -143,7 +145,7 @@ export default function MainPage() {
   useEffect(() => {
     if (!websocket) return
     const unsubscribers = [
-      websocket.subscribe('voice_state_change', (payload: any) => {
+      websocket.subscribe('voice_state_change', (payload: { state?: string }) => {
         const next = payload?.state || 'idle'
         setVoiceState(next)
         setVoiceStateStore(next)
@@ -156,30 +158,47 @@ export default function MainPage() {
           setIsTapBusy(false)
         }
       }),
-      websocket.subscribe('transcript_chunk', (payload: any) => {
+      websocket.subscribe('transcript_chunk', (payload: { text?: string; chunk?: string; is_final?: boolean }) => {
         const text = payload?.text || payload?.chunk || ''
         if (!text) return
+        // If backend marks the chunk as final, treat it as a completed user message
         if (payload?.is_final) {
           const finalText = payload.text || liveUserTextRef.current || text
           if (finalText) {
             addMessage('user', finalText, { source: 'voice' })
             setLiveUserText('')
           }
+          // Clear any pending debounce timer
+          if (transcriptTimeoutRef.current) {
+            clearTimeout(transcriptTimeoutRef.current)
+            transcriptTimeoutRef.current = null
+          }
           return
         }
+        // Update live transcription display
         if (payload?.text) setLiveUserText(payload.text)
         else if (payload?.chunk) setLiveUserText(prev => `${prev}${payload.chunk}`)
+
+        // Debounce handling: if no further chunks arrive within 800ms, consider transcription complete
+        if (transcriptTimeoutRef.current) clearTimeout(transcriptTimeoutRef.current)
+        transcriptTimeoutRef.current = setTimeout(() => {
+          const finalText = liveUserTextRef.current.trim()
+          if (finalText) {
+            addMessage('user', finalText, { source: 'voice' })
+            setLiveUserText('')
+          }
+        }, 800)
       }),
       websocket.subscribe('tts_start', () => {
         setLiveAssistantText('')
         setVoiceState('speaking')
       }),
-      websocket.subscribe('assistant_response_chunk', (payload: any) => {
+      websocket.subscribe('assistant_response_chunk', (payload: { text_chunk?: string }) => {
         const chunk = sanitizeAssistantText(payload?.text_chunk || '')
         if (!chunk) return
         setLiveAssistantText(prev => `${prev}${chunk}`)
       }),
-      websocket.subscribe('tts_end', (payload: any) => {
+      websocket.subscribe('tts_end', (payload: { duration_ms?: number }) => {
         if (payload?.duration_ms) setLatencyMs(Math.round(Number(payload.duration_ms)))
         finalizeAssistantStreaming()
         
@@ -193,10 +212,10 @@ export default function MainPage() {
           return prev
         })
       }),
-      websocket.subscribe('audio_level', (payload: any) => {
+      websocket.subscribe('audio_level', (payload: { levels?: number[] }) => {
         setAudioLevels(Array.isArray(payload?.levels) ? payload.levels : [])
       }),
-      websocket.subscribe('error', (payload: any) => {
+      websocket.subscribe('error', (payload: { code?: string; message?: string }) => {
         setVoiceState('error')
         setVoiceStateStore('error')
         addToast({ type: 'warning', title: payload?.code || 'Error', message: payload?.message })
@@ -219,7 +238,9 @@ export default function MainPage() {
           <Canvas camera={{ position: [0, 0, 6] }}>
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1} />
-            <JarvisReactor state={voiceState.toUpperCase()} audioLevel={Math.max(...audioLevels, 0)} />
+                <Suspense fallback={null}>
+                  <JarvisReactor state={voiceState.toUpperCase()} audioLevel={Math.max(...audioLevels, 0)} />
+                </Suspense>
           </Canvas>
         </div>
       </div>
@@ -260,20 +281,22 @@ export default function MainPage() {
                 </>
               )}
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleTheme}
-              className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
-            >
+<motion.button
+               whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
+               whileTap={{ scale: 0.95 }}
+               onClick={toggleTheme}
+               className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
+               aria-label="Toggle theme"
+             >
               {theme === 'dark' ? <Sun size={20} className="text-foreground/80" /> : <Moon size={20} className="text-foreground/80" />}
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/settings')}
-              className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
-            >
+<motion.button
+               whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
+               whileTap={{ scale: 0.95 }}
+               onClick={() => navigate('/settings')}
+               className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl transition-all"
+               aria-label="Open settings"
+             >
               <Settings size={20} className="text-foreground/80" />
             </motion.button>
           </div>
@@ -316,7 +339,7 @@ export default function MainPage() {
                   </motion.div>
                 ) : (
                   <div className="flex flex-col gap-8 min-h-full justify-end">
-                    {messages.map((msg: any) => (
+                    {messages.map((msg: { id: string; role: string; content: string }) => (
                       <motion.div
                         key={msg.id}
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -407,19 +430,20 @@ export default function MainPage() {
             animate={{ y: 0, opacity: 1 }}
             className="flex items-center gap-4 p-4 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-3xl bg-black/20"
           >
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleMicClick}
-              disabled={connectionState !== 'connected'}
-              className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg",
-                isBusy 
-                  ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
-                  : "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400",
-                connectionState !== 'connected' && "opacity-40 cursor-not-allowed"
-              )}
-            >
+<motion.button
+               whileHover={{ scale: 1.1 }}
+               whileTap={{ scale: 0.9 }}
+               onClick={handleMicClick}
+               disabled={connectionState !== 'connected'}
+               className={cn(
+                 "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg",
+                 isBusy 
+                   ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                   : "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400",
+                 connectionState !== 'connected' && "opacity-40 cursor-not-allowed"
+               )}
+               aria-label="Toggle microphone"
+             >
               {isBusy ? <MicOff size={24} /> : <Mic size={24} />}
             </motion.button>
 
@@ -434,18 +458,19 @@ export default function MainPage() {
                 placeholder="Ask me anything..."
                 className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 text-lg py-2"
               />
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                type="submit"
-                disabled={!typedText.trim()}
-                className={cn(
-                  "p-3.5 rounded-2xl transition-all duration-300 shadow-xl",
-                  "bg-gradient-to-br from-cyan-500 to-blue-600 text-white",
-                  "hover:from-cyan-400 hover:to-blue-500",
-                  "disabled:opacity-20 disabled:grayscale"
-                )}
-              >
+<motion.button
+                 whileHover={{ scale: 1.1 }}
+                 whileTap={{ scale: 0.9 }}
+                 type="submit"
+                 disabled={!typedText.trim()}
+                 className={cn(
+                   "p-3.5 rounded-2xl transition-all duration-300 shadow-xl",
+                   "bg-gradient-to-br from-cyan-500 to-blue-600 text-white",
+                   "hover:from-cyan-400 hover:to-blue-500",
+                   "disabled:opacity-20 disabled:grayscale"
+                 )}
+                 aria-label="Send message"
+               >
                 <Send size={20} />
               </motion.button>
             </form>

@@ -5,12 +5,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+import numpy as np
 from core.logger import get_logger
 from core.orchestrator import get_orchestrator
 from fastapi import WebSocket, WebSocketDisconnect
-from voice.state_machine import VoiceState
-
-from api.schemas import WebSocketMessage
+from schemas.websocket import WebSocketMessage
+from services.voice.state_machine import VoiceState
 
 logger = get_logger(__name__)
 
@@ -30,8 +30,8 @@ async def handle_websocket(websocket: WebSocket) -> None:
     await websocket.accept()
     backend = get_orchestrator()
 
-    backend.clients.add(websocket)
-    logger.info(f"Client connected. count={len(backend.clients)}")
+    backend.ws_manager.clients.add(websocket)
+    logger.info(f"Client connected. count={len(backend.ws_manager.clients)}")
 
     await websocket.send_text(
         json.dumps(
@@ -155,7 +155,7 @@ async def handle_websocket(websocket: WebSocket) -> None:
                         )
                         continue
 
-                    await backend._process_text_command(
+                    await backend.voice_pipeline._process_text_command(
                         user_text=text,
                         request_id=req_id or str(uuid4()),
                     )
@@ -189,7 +189,7 @@ async def handle_websocket(websocket: WebSocket) -> None:
                         if isinstance(threshold_level, str):
                             backend.speaker_verifier.set_threshold(threshold_level)
 
-                        await backend.broadcast(
+                        await backend.ws_manager.broadcast(
                             _message(
                                 msg_type="settings_sync", payload=handled["payload"]
                             )
@@ -209,7 +209,7 @@ async def handle_websocket(websocket: WebSocket) -> None:
                             "threshold_used": backend.speaker_verifier.current_threshold,
                             "pin_required": False,
                         }
-                        await backend.broadcast(
+                        await backend.ws_manager.broadcast(
                             _message(
                                 msg_type="auth_result",
                                 payload=backend.latest_auth_result,
@@ -272,10 +272,14 @@ async def handle_websocket(websocket: WebSocket) -> None:
                         )
                         continue
 
-                    audio = backend._decode_audio_payload(audio_b64)
+                    audio_int16 = backend.voice_pipeline._decode_audio_payload(
+                        audio_b64
+                    )
+                    # Convert int16 audio to float32 as expected by enrollment process
+                    audio_float32 = audio_int16.astype(np.float32) / 32768.0
                     response = await backend.enrollment.process_sample(
                         user_id=user_id,
-                        audio=audio,
+                        audio=audio_float32,
                         step=step,
                         transcript_text=transcript_text,
                         capture_duration_ms=capture_duration_ms,
@@ -357,5 +361,5 @@ async def handle_websocket(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("Unhandled error in websocket client handler")
     finally:
-        backend.clients.discard(websocket)
-        logger.info(f"Client disconnected. count={len(backend.clients)}")
+        backend.ws_manager.clients.discard(websocket)
+        logger.info(f"Client disconnected. count={len(backend.ws_manager.clients)}")

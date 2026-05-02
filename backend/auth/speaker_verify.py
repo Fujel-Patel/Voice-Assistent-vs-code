@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 import numpy as np
 from core.logger import get_logger
-from storage.db import get_db
+from infrastructure.database.db import get_db
 
 from .embeddings import SpeakerEmbeddingEngine
 from .enrollment import VoiceEnrollment

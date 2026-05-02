@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 import numpy as np
 import pytest
 from core.event_bus import EventBus
-from voice.audio_player import AudioPlayer
-from voice.tts import TTSManager
-from voice.tts_local import LocalTTS
+from infrastructure.audio.audio_player import AudioPlayer
+from services.voice.tts import TTSManager
+from services.voice.tts_local import LocalTTS
 
 
 def _config() -> SimpleNamespace:

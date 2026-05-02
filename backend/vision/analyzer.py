@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
 
 import httpx
-from config.config_loader import load_config
+from core.config import load_config
 from core.logger import get_logger
 
 logger = get_logger(__name__)

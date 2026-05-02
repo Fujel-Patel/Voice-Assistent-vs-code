@@ -4,13 +4,17 @@ import asyncio
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-psutil: Any
-try:
-    import psutil
-except Exception:  # pragma: no cover - handled gracefully at runtime
-    psutil = None
+if TYPE_CHECKING:
+    import psutil as _psutil_type
+else:
+    try:
+        import psutil as _psutil_type
+    except Exception:  # pragma: no cover - handled gracefully at runtime
+        _psutil_type = None  # type: ignore[assignment]
+
+psutil = _psutil_type
 
 from core.logger import get_logger
 from os_bridge.platform_detect import detect_platform
@@ -230,12 +234,12 @@ class AppLauncherPlugin(JarvisPlugin):
             data={"apps": processes[:80]},
         )
 
-    def _find_processes(self, candidates: Iterable[str]) -> list[psutil.Process]:
+    def _find_processes(self, candidates: Iterable[str]) -> list[Any]:
         if psutil is None:
             return []
 
         names = {c.lower() for c in candidates if c}
-        matched: list[psutil.Process] = []
+        matched: list[Any] = []
 
         for proc in psutil.process_iter(["pid", "name", "exe", "cmdline"]):
             try:

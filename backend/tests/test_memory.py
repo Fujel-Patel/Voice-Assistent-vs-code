@@ -6,7 +6,7 @@ import pytest
 from brain.memory.context_builder import ContextBuilder
 from brain.memory.long_term import LongTermMemory
 from brain.memory.short_term import ShortTermMemory
-from storage.db import Database
+from infrastructure.database.db import Database
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -46,7 +46,7 @@ async def test_short_term_token_budget() -> None:
 async def test_long_term_store_and_search(tmp_path: Path) -> None:
     from typing import Any
 
-    from storage import db as db_module
+    from infrastructure.database import db as db_module
 
     cast(Any, db_module).db = Database(db_path=tmp_path / "memory.db")
     await cast(Any, db_module).db.initialize()

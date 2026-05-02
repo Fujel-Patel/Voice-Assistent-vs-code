@@ -43,7 +43,7 @@ def test_multi_monitor_list(mocker: Any) -> None:
             {"left": 1920, "top": 0, "width": 1920, "height": 1080},
         ]
 
-        def __enter__(self) -> FakeMSS:
+        def __enter__(self) -> "FakeMSS":
             return self
 
         def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:

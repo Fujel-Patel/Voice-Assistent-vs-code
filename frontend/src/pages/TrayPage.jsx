@@ -25,18 +25,18 @@ export default function TrayPage() {
         onToggleMute={() => setIsMuted((m) => !m)}
         onShowWindow={() => {
           // In Electron: ipcRenderer.send('show-main-window')
-          console.log('[Tray] Show main window')
+          // Show main window – Electron IPC placeholder
         }}
         onOpenActivityLog={() => {
-          console.log('[Tray] Open activity log')
+          // Open activity log – Electron IPC placeholder
         }}
         onOpenSettings={() => {
           // In Electron: ipcRenderer.send('navigate', '/settings')
-          console.log('[Tray] Open settings')
+          // Open settings – Electron IPC placeholder
         }}
         onQuit={() => {
           // In Electron: ipcRenderer.send('quit-app')
-          console.log('[Tray] Quit Jarvis')
+          // Quit Jarvis – Electron IPC placeholder
         }}
       />
     </div>

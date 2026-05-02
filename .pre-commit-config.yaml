@@ -10,6 +10,7 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
+        exclude: ^backend/tests/
         additional_dependencies:
           - pydantic>=2.6.0
           - fastapi

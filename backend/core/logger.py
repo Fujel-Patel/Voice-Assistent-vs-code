@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
-from config.config_loader import load_config
-from loguru import Logger
 from loguru import logger as _logger
+
+from core.config import load_config
 
 
 class _WebSocketNoiseFilter(logging.Filter):
@@ -65,7 +66,7 @@ def _configure_logger() -> None:
 _configured = False
 
 
-def get_logger(name: str) -> Logger:
+def get_logger(name: str) -> Any:
     global _configured
     if not _configured:
         _configure_logger()

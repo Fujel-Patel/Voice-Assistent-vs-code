@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
-from storage.db import get_db
+from infrastructure.database.db import get_db
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray

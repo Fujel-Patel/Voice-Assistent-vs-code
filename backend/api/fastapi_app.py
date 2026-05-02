@@ -8,8 +8,8 @@ from core.orchestrator import get_orchestrator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers.system import router as system_router
-from api.routers.websocket import router as websocket_router
+from api.v1.health import router as health_router
+from api.v1.websocket import router as websocket_router
 
 logger = get_logger(__name__)
 
@@ -37,5 +37,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(system_router)
+app.include_router(health_router, prefix="/api/v1")
 app.include_router(websocket_router)

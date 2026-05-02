@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
 import pytest
-from config.config_loader import JarvisConfig
-from voice.stt import SpeechToText
+from core.config import JarvisConfig
+from services.voice.stt import SpeechToText
 
 
 @pytest.mark.asyncio

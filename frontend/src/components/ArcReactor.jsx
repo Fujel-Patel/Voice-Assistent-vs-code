@@ -75,10 +75,13 @@ export default function ArcReactor({ state = 'idle', audioLevel = 0 }) {
     window.addEventListener('resize', resize)
     frameRef.current = requestAnimationFrame(draw)
 
-    return () => {
-      window.removeEventListener('resize', resize)
-      if (frameRef.current) cancelAnimationFrame(frameRef.current)
+  return () => {
+    window.removeEventListener('resize', resize)
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
     }
+  }
   }, [state, audioLevel])
 
   return <canvas ref={canvasRef} className='arc-reactor-canvas' />

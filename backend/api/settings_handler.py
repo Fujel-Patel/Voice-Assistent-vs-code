@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from config.config_loader import (
+from core.config import (
     ENV_FILE_PATH,
     export_config,
     get_config_dict,
@@ -64,6 +64,9 @@ class SettingsHandler:
                 self._store_api_key(key, value)
             else:
                 save_setting(key, value)
+                from core.config import load_config
+
+                load_config.cache_clear()
             return {
                 "type": "settings_updated",
                 "payload": {
@@ -94,6 +97,9 @@ class SettingsHandler:
             if regular_settings:
                 nested = self._unflatten(regular_settings)
                 save_all(nested)
+                from core.config import load_config
+
+                load_config.cache_clear()
 
             for key, value in key_settings.items():
                 self._store_api_key(str(key), value)
@@ -327,6 +333,11 @@ class SettingsHandler:
         text_value = "" if value is None else str(value)
         os.environ[env_name] = text_value
         self._upsert_env_file(env_name, text_value)
+
+        # Clear cached config so new key takes effect immediately
+        from core.config import load_config
+
+        load_config.cache_clear()
 
     def _upsert_env_file(self, key: str, value: str) -> None:
         ENV_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)

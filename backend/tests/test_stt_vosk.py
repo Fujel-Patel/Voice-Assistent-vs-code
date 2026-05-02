@@ -4,9 +4,9 @@ from typing import Any
 
 import numpy as np
 import pytest
-import voice.stt_vosk as stt_vosk_module
-from config.config_loader import JarvisConfig
-from voice.stt_vosk import SpeechToTextVosk
+import services.voice.stt_vosk as stt_vosk_module
+from core.config import JarvisConfig
+from services.voice.stt_vosk import SpeechToTextVosk
 
 
 class _FakeRecognizer:

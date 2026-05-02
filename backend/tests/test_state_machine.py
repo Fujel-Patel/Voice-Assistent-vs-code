@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from core.event_bus import EventBus
-from voice.state_machine import VoicePipeline, VoiceState
+from services.voice.state_machine import VoicePipeline, VoiceState
 
 
 @pytest.mark.asyncio

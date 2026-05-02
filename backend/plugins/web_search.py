@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from core.logger import get_logger
-from services.brave_search import BraveSearch
-from services.duckduckgo import DuckDuckGoSearch
-from services.url_summarizer import URLSummarizer
-from services.web_fetcher import WebFetcher
+from services.web.brave_search import BraveSearch
+from services.web.duckduckgo import DuckDuckGoSearch
+from services.web.url_summarizer import URLSummarizer
+from services.web.web_fetcher import WebFetcher
 
 from plugins.base import JarvisPlugin, PluginResult
 

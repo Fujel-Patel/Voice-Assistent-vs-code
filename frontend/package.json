@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "analyze": "vite build && npx vite-bundle-analyzer",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

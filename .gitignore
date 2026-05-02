@@ -49,9 +49,19 @@ console-errors.txt
 scratch.py
 skills-lock.json
 
+# Temp debugging / migration files
+mypy_*.txt
+mypy_*.ini
+fix_*.py
+refactor_*.py
+test_health.py
+
 # Tooling
 .agent/
 .agents/
 .claude/
 .windsurf/
+.windsurfrules
 .playwright-mcp/
+.openclaude-profile.json
+.aider*

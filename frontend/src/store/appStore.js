@@ -59,20 +59,21 @@ export const useAppStore = create(
         toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
 
 
-        addMessage: (role, content, metadata = {}) =>
-          set((state) => ({
-            messages: [
-              ...state.messages,
-              {
+addMessage: (role, content, metadata = {}) =>
+            set((state) => {
+              const newMessage = {
                 id: `${Date.now()}-${Math.random()}`,
                 role,
                 content,
                 timestamp: new Date().toISOString(),
                 intent: metadata.intent || null,
                 ...metadata,
-              },
-            ],
-          })),
+              };
+              const maxMessages = 200; // limit to prevent unbounded growth
+              const messages = [...state.messages, newMessage];
+              const trimmed = messages.length > maxMessages ? messages.slice(messages.length - maxMessages) : messages;
+              return { messages: trimmed };
+            }),
         setCurrentTranscription: (currentTranscription) => set({ currentTranscription }),
         appendCurrentTranscription: (chunk) =>
           set((state) => ({

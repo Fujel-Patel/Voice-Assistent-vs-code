@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from services.startup import StartupDependencies, StartupManager
+from services.web.startup import StartupDependencies, StartupManager
 
 
 @pytest.mark.asyncio

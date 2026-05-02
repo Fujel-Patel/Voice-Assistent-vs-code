@@ -5,9 +5,16 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+import os
+import sys
+
 import numpy as np
 import pytest
-from config.config_loader import load_config
+
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+from core.config import load_config
 from core.event_bus import EventBus
 
 

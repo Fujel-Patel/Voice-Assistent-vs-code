@@ -4,9 +4,9 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from config.config_loader import load_config
+from core.config import load_config
 from core.event_bus import EventBus
-from voice.stt_manager import STTManager
+from services.voice.stt_manager import STTManager
 
 
 @pytest.mark.asyncio

@@ -1,15 +1,17 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ThemeProvider } from './components/ThemeProvider'
 import AppShell from './layouts/AppShell'
-import MainPage from './pages/MainPage'
-import SettingsPage from './pages/SettingsPage'
-import VoiceEnrollmentPage from './pages/VoiceEnrollmentPage'
-import DashboardPage from './pages/DashboardPage'
+import { lazy, Suspense } from 'react'
+
+const MainPage = lazy(() => import('./pages/MainPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const VoiceEnrollmentPage = lazy(() => import('./pages/VoiceEnrollmentPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="jarvis-theme">
-      <AppShell>
+    <AppShell>
+      <Suspense fallback={<div className="flex items-center justify-center h-full">Loading…</div>}>
         <Routes>
           <Route path='/' element={<MainPage />} />
           <Route path='/settings' element={<SettingsPage />} />
@@ -17,7 +19,7 @@ export default function App() {
           <Route path='/dashboard' element={<DashboardPage />} />
           <Route path='*' element={<Navigate to='/' replace />} />
         </Routes>
-      </AppShell>
-    </ThemeProvider>
+      </Suspense>
+    </AppShell>
   )
 }
