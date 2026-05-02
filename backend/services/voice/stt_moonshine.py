@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-import moonshine
+try:
+    import moonshine
+except Exception as exc:
+    moonshine = None
+    _moonshine_import_error = exc
 import numpy as np
 from core.config import JarvisConfig
 from core.logger import get_logger
